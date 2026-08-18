@@ -16,8 +16,38 @@ export type EventType =
 	| 'severe_sleep_deprived'
 	| 'recovery';
 
-/** 同一 Tick 内での無限連鎖を防ぐための伝播 Depth 上限（要件定義 11 章） */
+/**
+ * 同一 Tick 内での無限連鎖を防ぐための伝播 Depth 上限（要件定義 11 章）。
+ *
+ * 制限するのは「1 Tick の中で連鎖が際限なく広がること」であり、
+ * 日をまたいで積み上がる因果チェーン全体の長さではない。
+ * 数日かけて伸びたチェーンの depth はこの値を超えてよい。
+ */
 export const MAX_EVENT_DEPTH = 10;
+
+/** 都市内の Network 種別（要件定義 5 章） */
+export type NetworkName = 'transportation' | 'work' | 'household';
+
+const NETWORK_BY_EVENT_TYPE: Partial<Record<EventType, NetworkName>> = {
+	accident: 'transportation',
+	traffic_jam: 'transportation',
+	commute_delay: 'transportation',
+	late_arrival: 'transportation',
+	work_delay: 'work',
+	work_failure: 'work',
+	overtime: 'work',
+	delivery_delay: 'work',
+	store_delay: 'work',
+	household_delay: 'household',
+};
+
+/**
+ * その Event がどの Network 上の出来事かを返す。
+ * どの Network にも属さない Event（睡眠・判断など）は undefined。
+ */
+export function networkOfEventType(type: EventType): NetworkName | undefined {
+	return NETWORK_BY_EVENT_TYPE[type];
+}
 
 export interface EventImpact {
 	delayMinutes?: number;
@@ -113,7 +143,7 @@ export class SimulationEvent {
 		);
 	}
 
-	/** 伝播 Depth 上限に達しており、これ以上連鎖させてはならないか */
+	/** 同一 Tick 内での伝播上限に達しており、これ以上連鎖させてはならないか */
 	get isAtMaxDepth(): boolean {
 		return this.depth >= MAX_EVENT_DEPTH;
 	}

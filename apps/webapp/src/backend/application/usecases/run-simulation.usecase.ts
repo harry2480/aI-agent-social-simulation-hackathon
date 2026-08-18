@@ -1,6 +1,7 @@
 import type { AiDecisionGateway } from '../../domain/gateways/ai-decision.gateway';
 import type { ExperimentConfig } from '../../domain/models/experiment-config.model';
 import type { RunSummary } from '../../domain/models/metrics.model';
+import type { SimulationEvent } from '../../domain/models/simulation-event.model';
 import type { SimulationState } from '../../domain/models/simulation-state.model';
 import type {
 	RunPersistencePayload,
@@ -135,4 +136,39 @@ export function buildRunPersistencePayload(
 			}),
 		metrics: state.metricsHistory,
 	};
+}
+
+/**
+ * 保存対象の Event を選ぶ。
+ *
+ * 重要 Event だけを保存すると、その原因にあたる Event（例: Accident を引き起こした
+ * Decision）が落ちて Causal Edge の片端が失われ、保存後の Run では
+ * 「新規 Sleep-Deprived Case の原因を遡れる」という要件を満たせなくなる。
+ * そのため重要 Event に加えて、そこから遡れる祖先 Event も保存する。
+ */
+export function selectPersistableEvents(state: SimulationState): SimulationEvent[] {
+	const selected = new Set<string>();
+	const frontier: string[] = [];
+
+	for (const event of state.events) {
+		if (event.isSignificant) {
+			selected.add(event.id);
+			frontier.push(...event.causedByEventIds);
+		}
+	}
+
+	while (frontier.length > 0) {
+		const eventId = frontier.pop();
+		if (eventId === undefined || selected.has(eventId)) {
+			continue;
+		}
+		const event = state.eventById(eventId);
+		if (event === undefined) {
+			continue;
+		}
+		selected.add(event.id);
+		frontier.push(...event.causedByEventIds);
+	}
+
+	return state.events.filter((event) => selected.has(event.id));
 }

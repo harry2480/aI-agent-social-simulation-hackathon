@@ -7,7 +7,7 @@ import type {
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import {
 	SLEEP_STATE_ORDER,
-	resolveSleepStateColors,
+	sleepStateColorVars,
 	sleepStatePresentation,
 } from '@/frontend/lib/sleep-state-presentation';
 import { useEffect, useRef } from 'react';
@@ -66,7 +66,13 @@ export function CityMap({
 		const mutedColor = styles.getPropertyValue('--color-muted-foreground').trim() || '#71717a';
 		const alertColor = styles.getPropertyValue('--color-alert').trim() || '#dc2626';
 		const foreground = styles.getPropertyValue('--color-foreground').trim() || '#18181b';
-		const stateColors = resolveSleepStateColors(canvas);
+		// CSS 変数から実際の色を解決する。描画コード内に色リテラルを持たない
+		const colorVars = sleepStateColorVars();
+		const stateColors = {} as Record<SleepStateName, string>;
+		for (const state of SLEEP_STATE_ORDER) {
+			const value = styles.getPropertyValue(colorVars[state]).trim();
+			stateColors[state] = value.length > 0 ? value : mutedColor;
+		}
 
 		const districtById = new Map(city.districts.map((district) => [district.id, district]));
 		const congested = new Set(congestedRoadIds);

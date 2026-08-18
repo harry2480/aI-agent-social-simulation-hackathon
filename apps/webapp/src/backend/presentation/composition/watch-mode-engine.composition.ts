@@ -3,6 +3,10 @@ import type { AiDecisionGateway } from '../../domain/gateways/ai-decision.gatewa
 import type { ExperimentConfig } from '../../domain/models/experiment-config.model';
 import type { RunSummary as RunSummaryType } from '../../domain/models/metrics.model';
 import type { SimulationState as SimulationStateType } from '../../domain/models/simulation-state.model';
+import {
+	CausalGraphService,
+	type CausalSubgraph,
+} from '../../domain/services/causal-graph.service';
 import { SimulationEngine } from '../../domain/services/simulation-engine.service';
 import { HttpAiDecisionGateway } from '../../infrastructure/adapters/http-ai-decision.adapter';
 import { RuleBasedAiDecisionGateway } from '../../infrastructure/adapters/rule-based-ai-decision.adapter';
@@ -79,3 +83,29 @@ export function buildWatchRunPayload(state: SimulationStateType, summary: RunSum
 		metrics: [...payload.metrics],
 	};
 }
+
+/**
+ * Causal Graph の部分グラフを組み立てる。
+ * クライアントは domain を直接参照できないため、この composition を経由する。
+ */
+export function buildCausalSubgraph(
+	state: SimulationStateType,
+	focusEventId: string,
+	options?: { maxNodes?: number },
+): CausalSubgraph {
+	return new CausalGraphService().buildSubgraph(state, focusEventId, options ?? {});
+}
+
+/** ある Agent の因果を辿る起点 Event を選ぶ */
+export function findCausalFocusEventForAgent(
+	state: SimulationStateType,
+	agentId: string,
+): string | undefined {
+	return new CausalGraphService().findFocusEventForAgent(state, agentId)?.id;
+}
+
+export type {
+	CausalSubgraph,
+	CausalGraphNode,
+	CausalGraphEdge,
+} from '../../domain/services/causal-graph.service';
