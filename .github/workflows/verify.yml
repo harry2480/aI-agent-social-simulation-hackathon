@@ -1,10 +1,11 @@
 name: Verify
 
 on:
+  # ブランチを限定すると develop 向け PR で起動せず、品質ゲートが素通りする。
+  # 全 PR を対象にする
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,8 +13,9 @@ concurrency:
 
 jobs:
   verify:
+    name: lint・型チェック・Unit テスト・依存方向チェック
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -27,4 +29,5 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # lint → prisma generate → typecheck → unit test → depcruise
       - run: pnpm verify

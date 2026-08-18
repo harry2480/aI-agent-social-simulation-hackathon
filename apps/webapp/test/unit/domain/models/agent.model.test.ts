@@ -141,3 +141,100 @@ describe('Agent', () => {
 		});
 	});
 });
+
+describe('Agent.reconstruct', () => {
+	it('保存済みの値をそのまま復元する', () => {
+		const agent = Agent.reconstruct({
+			id: 'agent-0007',
+			role: 'driver',
+			homeId: 'home-1',
+			workplaceId: 'hub-1',
+			sleepNeedHours: 7.25,
+			responsibility: 0.8,
+			riskTolerance: 0.3,
+			cooperativeness: 0.6,
+			familyResponsibility: 0.7,
+			currentLocationId: 'hub-1',
+			sleepDebtHours: 3.5,
+			fatigue: 72,
+			stress: 40,
+			workPressure: 0.5,
+			currentAction: 'driving',
+			sleepMinutesThisNight: 120,
+			lastDecision: { action: 'continue_driving', reason: '責任を優先', model: 'gemma', tick: 40 },
+			lastSleepStateName: 'sleep_deprived',
+		});
+
+		expect(agent.id).toBe('agent-0007');
+		expect(agent.role).toBe('driver');
+		expect(agent.sleepNeedHours).toBe(7.25);
+		expect(agent.sleepDebtHours).toBe(3.5);
+		expect(agent.fatigue).toBe(72);
+		expect(agent.currentAction).toBe('driving');
+		expect(agent.sleepMinutesThisNight).toBe(120);
+		expect(agent.lastDecision?.action).toBe('continue_driving');
+		expect(agent.lastSleepStateName).toBe('sleep_deprived');
+	});
+});
+
+describe('Agent の状態更新', () => {
+	it('moveTo は現在地を更新する', () => {
+		const agent = createAgent();
+		agent.moveTo('workplace-9');
+		expect(agent.currentLocationId).toBe('workplace-9');
+	});
+
+	it('setAction は現在の行動を更新する', () => {
+		const agent = createAgent();
+		agent.setAction('overtime');
+		expect(agent.currentAction).toBe('overtime');
+	});
+
+	it('recordDecision は直近の判断を保持する', () => {
+		const agent = createAgent();
+		agent.recordDecision({ action: 'rest', reason: '疲労のため', model: 'rule-based', tick: 12 });
+		expect(agent.lastDecision).toEqual({
+			action: 'rest',
+			reason: '疲労のため',
+			model: 'rule-based',
+			tick: 12,
+		});
+	});
+
+	it('setWorkPressure は 0〜1 に丸める', () => {
+		const agent = createAgent();
+		agent.setWorkPressure(5);
+		expect(agent.workPressure).toBe(1);
+		agent.setWorkPressure(-5);
+		expect(agent.workPressure).toBe(0);
+	});
+
+	it('recordSleepMinutes は負の値を無視する', () => {
+		const agent = createAgent();
+		agent.recordSleepMinutes(60);
+		agent.recordSleepMinutes(-30);
+		expect(agent.sleepMinutesThisNight).toBe(60);
+	});
+
+	it('isParent は家庭責任の高さで決まる', () => {
+		const parent = Agent.reconstruct({
+			id: 'p',
+			role: 'office_worker',
+			homeId: 'home-1',
+			sleepNeedHours: 7,
+			responsibility: 0.5,
+			riskTolerance: 0.5,
+			cooperativeness: 0.5,
+			familyResponsibility: 0.6,
+			currentLocationId: 'home-1',
+			sleepDebtHours: 0,
+			fatigue: 0,
+			stress: 0,
+			workPressure: 0.5,
+			currentAction: 'idle',
+			sleepMinutesThisNight: 0,
+			lastSleepStateName: 'normal',
+		});
+		expect(parent.isParent).toBe(true);
+	});
+});
