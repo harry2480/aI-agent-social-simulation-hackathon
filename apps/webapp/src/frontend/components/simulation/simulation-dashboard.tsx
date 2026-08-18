@@ -8,10 +8,13 @@ import type {
 	ShockTarget,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import {
+	buildCausalSubgraph,
 	buildWatchRunPayload,
+	findCausalFocusEventForAgent,
 	sleepStateFrom,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { AgentDetailPanel } from '@/frontend/components/agent-detail/agent-detail-panel';
+import { CausalGraph } from '@/frontend/components/causal-graph/causal-graph';
 import { CityMap } from '@/frontend/components/city-map/city-map';
 import { KpiPanel } from '@/frontend/components/kpi/kpi-panel';
 import { EventTimeline } from '@/frontend/components/timeline/event-timeline';
@@ -85,6 +88,7 @@ export function SimulationDashboard() {
 	} = useWatchModeSimulation();
 	const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+	const [focusEventId, setFocusEventId] = useState<string | null>(null);
 	const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -119,9 +123,40 @@ export function SimulationDashboard() {
 		[view, selectedAgentId],
 	);
 
+	/** Agent を選んだら、その Agent が睡眠不足へ至った Event を因果の起点にする */
+	const selectAgent = useCallback(
+		(agentId: string) => {
+			setSelectedAgentId(agentId);
+			const current = stateRef.current;
+			if (current !== null) {
+				setFocusEventId(findCausalFocusEventForAgent(current, agentId) ?? null);
+			}
+		},
+		[stateRef],
+	);
+
+	/** Timeline の Event を直接起点にする */
+	const selectEvent = useCallback((eventId: string, actorId?: string) => {
+		setFocusEventId(eventId);
+		if (actorId !== undefined) {
+			setSelectedAgentId(actorId);
+		}
+	}, []);
+
+	// stateRef は書き換わっても再レンダリングを起こさないため、
+	// Tick ごとに publish される view を条件に含めて再計算させる
+	const subgraph = useMemo(() => {
+		const current = stateRef.current;
+		if (view === null || current === null || focusEventId === null) {
+			return null;
+		}
+		return buildCausalSubgraph(current, focusEventId);
+	}, [stateRef, focusEventId, view]);
+
 	const reset = () => {
 		pause();
 		setSelectedAgentId(null);
+		setFocusEventId(null);
 		setSaveState('idle');
 		setSaveError(null);
 		initialize(buildParams(form));
@@ -306,7 +341,7 @@ export function SimulationDashboard() {
 							sleepStateOf={sleepStateOf}
 							congestedRoadIds={view.congestedRoadIds}
 							selectedAgentId={selectedAgentId}
-							onSelectAgent={setSelectedAgentId}
+							onSelectAgent={selectAgent}
 						/>
 					)}
 				</div>
@@ -332,8 +367,13 @@ export function SimulationDashboard() {
 				</p>
 			) : null}
 
-			<div className="min-h-0 basis-56">
-				<EventTimeline events={view?.recentEvents ?? []} onSelectAgent={setSelectedAgentId} />
+			<div className="grid min-h-0 basis-72 grid-cols-1 gap-3 lg:grid-cols-2">
+				<EventTimeline events={view?.recentEvents ?? []} onSelectEvent={selectEvent} />
+				<CausalGraph
+					subgraph={subgraph}
+					selectedEventId={focusEventId}
+					onSelectEvent={(eventId) => selectEvent(eventId)}
+				/>
 			</div>
 		</div>
 	);

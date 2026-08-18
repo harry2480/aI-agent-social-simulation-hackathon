@@ -16,7 +16,13 @@ export type EventType =
 	| 'severe_sleep_deprived'
 	| 'recovery';
 
-/** 同一 Tick 内での無限連鎖を防ぐための伝播 Depth 上限（要件定義 11 章） */
+/**
+ * 同一 Tick 内での無限連鎖を防ぐための伝播 Depth 上限（要件定義 11 章）。
+ *
+ * 制限するのは「1 Tick の中で連鎖が際限なく広がること」であり、
+ * 日をまたいで積み上がる因果チェーン全体の長さではない。
+ * 数日かけて伸びたチェーンの depth はこの値を超えてよい。
+ */
 export const MAX_EVENT_DEPTH = 10;
 
 export interface EventImpact {
@@ -113,7 +119,7 @@ export class SimulationEvent {
 		);
 	}
 
-	/** 伝播 Depth 上限に達しており、これ以上連鎖させてはならないか */
+	/** 同一 Tick 内での伝播上限に達しており、これ以上連鎖させてはならないか */
 	get isAtMaxDepth(): boolean {
 		return this.depth >= MAX_EVENT_DEPTH;
 	}

@@ -1,6 +1,7 @@
 import {
 	RunSimulationUseCase,
 	buildRunPersistencePayload,
+	selectPersistableEvents,
 } from '@/backend/application/usecases/run-simulation.usecase';
 import type {
 	RunPersistencePayload,
@@ -163,6 +164,62 @@ describe('buildRunPersistencePayload', () => {
 		for (const edge of payload.causalEdges) {
 			expect(typeof edge.fromEventKey).toBe('string');
 			expect(typeof edge.toEventKey).toBe('string');
+		}
+	});
+});
+
+describe('selectPersistableEvents', () => {
+	it('重要 Event の原因となった Event も保存対象に含める', async () => {
+		const engine = SimulationEngine.create(config(), new RuleBasedAiDecisionGateway());
+		const state = engine.initialize();
+		await engine.run(state);
+
+		const selected = selectPersistableEvents(state);
+		const selectedIds = new Set(selected.map((event) => event.id));
+
+		// 保存対象の Event の原因は必ず保存対象に含まれる（Causal Edge の片端が欠けない）
+		for (const event of selected) {
+			for (const causeId of event.causedByEventIds) {
+				expect(selectedIds.has(causeId)).toBe(true);
+			}
+		}
+	});
+
+	it('事故を引き起こした Decision は重要 Event でなくても保存する', async () => {
+		const engine = SimulationEngine.create(
+			createTestConfig({
+				seed: 42,
+				population: 120,
+				days: 4,
+				initialSleepDeprivedRate: 0.3,
+				shockTarget: 'driver',
+			}),
+			new RuleBasedAiDecisionGateway(),
+		);
+		const state = engine.initialize();
+		await engine.run(state);
+
+		const accident = state.events.find((event) => event.type === 'accident');
+		expect(accident).toBeDefined();
+
+		const selectedIds = new Set(selectPersistableEvents(state).map((event) => event.id));
+		for (const causeId of accident?.causedByEventIds ?? []) {
+			expect(selectedIds.has(causeId)).toBe(true);
+		}
+	});
+
+	it('どこからも参照されない非重要 Event は保存しない', async () => {
+		const engine = SimulationEngine.create(config(), new RuleBasedAiDecisionGateway());
+		const state = engine.initialize();
+		await engine.run(state);
+
+		const selectedIds = new Set(selectPersistableEvents(state).map((event) => event.id));
+		const referenced = new Set(state.events.flatMap((event) => event.causedByEventIds));
+		const dropped = state.events.filter((event) => !selectedIds.has(event.id));
+
+		for (const event of dropped) {
+			expect(event.isSignificant).toBe(false);
+			expect(referenced.has(event.id)).toBe(false);
 		}
 	});
 });

@@ -6,7 +6,8 @@ import { formatEventLabel } from '@/frontend/lib/format';
 
 interface EventTimelineProps {
 	events: readonly SimulationEvent[];
-	onSelectAgent: (agentId: string) => void;
+	/** Event を選ぶと Causal Graph の起点になる。actorId があれば Agent Detail も切り替える */
+	onSelectEvent: (eventId: string, actorId?: string) => void;
 }
 
 function formatTick(tick: number): string {
@@ -17,7 +18,7 @@ function formatTick(tick: number): string {
 }
 
 /** 重要 Event のみを表示する。全 Tick ログは表示しない（要件定義 37 章） */
-export function EventTimeline({ events, onSelectAgent }: EventTimelineProps) {
+export function EventTimeline({ events, onSelectEvent }: EventTimelineProps) {
 	return (
 		<Card className="flex min-h-0 flex-col">
 			<CardHeader className="pb-2">
@@ -33,11 +34,7 @@ export function EventTimeline({ events, onSelectAgent }: EventTimelineProps) {
 								<button
 									type="button"
 									className="w-full text-left"
-									onClick={() => {
-										if (event.actorId !== undefined) {
-											onSelectAgent(event.actorId);
-										}
-									}}
+									onClick={() => onSelectEvent(event.id, event.actorId)}
 								>
 									<span className="font-mono tabular-nums text-muted-foreground">
 										{formatTick(event.tick)}
