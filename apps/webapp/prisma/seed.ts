@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { jokeSeeder } from './seeders/joke.seeder';
 import type { Seeder } from './seeders/seeder';
 
 const prisma = new PrismaClient();
 
-const seeders: Seeder[] = [jokeSeeder];
+const seeders: Seeder[] = [];
 
 async function main() {
 	for (const seeder of seeders) {

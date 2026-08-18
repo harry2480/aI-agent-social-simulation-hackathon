@@ -1,4 +1,3 @@
-import { SidebarNav } from '@/frontend/components/sidebar-nav';
 import type { Metadata } from 'next';
 import { Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
@@ -11,21 +10,15 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-	title: 'Product Starter',
-	description: 'Claude Code でプロダクトを素早く構築するスターターキット',
+	title: 'SLEEP CITY 2.0',
+	description:
+		'睡眠不足が都市の中でどのように伝播し自己増殖するかを観測する AI マルチエージェント都市シミュレーション',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="ja" className={notoSansJP.variable}>
-			<body className="font-sans">
-				<div className="flex min-h-screen flex-col md:flex-row">
-					<SidebarNav />
-					<main className="flex-1 overflow-auto">
-						<div className="mx-auto max-w-3xl px-4 py-8 md:px-8">{children}</div>
-					</main>
-				</div>
-			</body>
+			<body className="min-h-dvh bg-background font-sans text-foreground">{children}</body>
 		</html>
 	);
 }

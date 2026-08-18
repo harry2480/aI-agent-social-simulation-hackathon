@@ -58,6 +58,14 @@
 	/* テーブルヘッダー背景 */
 	--color-table-header-bg: var(--table-header-bg);
 
+	/* --- SLEEP CITY: 睡眠状態カラートークン --- */
+	/* 状態は色だけで区別せず、必ずアイコン形状・ラベルと併用すること */
+	--color-sleep-normal: var(--sleep-normal);
+	--color-sleep-tired: var(--sleep-tired);
+	--color-sleep-deprived: var(--sleep-deprived);
+	--color-sleep-severe: var(--sleep-severe);
+	--color-alert: var(--alert);
+
 	/* プラットフォーム別バッジカラー */
 	--color-badge-youtube: var(--badge-youtube);
 	--color-badge-x: var(--badge-x);
@@ -140,6 +148,13 @@
 
 	/* ログアウトボタン背景 */
 	--logout-bg: #e8eaed;
+
+	/* SLEEP CITY: 睡眠状態 */
+	--sleep-normal: oklch(0.72 0.13 175);
+	--sleep-tired: oklch(0.8 0.14 85);
+	--sleep-deprived: oklch(0.68 0.17 45);
+	--sleep-severe: oklch(0.58 0.21 20);
+	--alert: oklch(0.62 0.23 15);
 }
 
 .dark {
@@ -175,6 +190,13 @@
 	--sidebar-accent-foreground: oklch(0.985 0 0);
 	--sidebar-border: oklch(0.269 0 0);
 	--sidebar-ring: oklch(0.439 0 0);
+
+	/* SLEEP CITY: 睡眠状態（ダーク） */
+	--sleep-normal: oklch(0.78 0.13 175);
+	--sleep-tired: oklch(0.85 0.14 85);
+	--sleep-deprived: oklch(0.74 0.17 45);
+	--sleep-severe: oklch(0.66 0.21 20);
+	--alert: oklch(0.7 0.23 15);
 }
 
 @layer base {
