@@ -24,7 +24,7 @@ description: データベースにテーブルを追加・変更する。Prisma�
 pnpm db:migrate
 ```
 
-マイグレーション名の入力を求められたら、変更内容を簡潔に英語で入力する（例: `add_jokes_table`）。
+マイグレーション名の入力を求められたら、変更内容を簡潔に英語で入力する（例: `add_agents_table`）。
 
 ### 3. Repository 生成
 
