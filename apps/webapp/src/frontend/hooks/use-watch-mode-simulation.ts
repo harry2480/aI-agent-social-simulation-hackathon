@@ -3,6 +3,7 @@
 import {
 	type Agent,
 	ExperimentConfig,
+	type ExperimentConfigError,
 	type ExperimentConfigParams,
 	type MetricsSnapshot,
 	type SimulationEvent,
@@ -27,6 +28,13 @@ export interface WatchModeView {
 const BASE_TICK_INTERVAL_MS = 200;
 /** Timeline へ保持する重要 Event の最大件数 */
 const TIMELINE_LIMIT = 60;
+
+const CONFIG_ERROR_MESSAGES: Record<ExperimentConfigError, string> = {
+	SEED_NOT_INTEGER: 'Seed には整数を指定してください。',
+	POPULATION_OUT_OF_RANGE: 'Population は 1〜500 の範囲で指定してください。',
+	DAYS_OUT_OF_RANGE: 'Days は 1〜14 の範囲で指定してください。',
+	INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE: '初期睡眠不足率は 0〜1 の範囲で指定してください。',
+};
 
 /**
  * Watch Mode の Simulation をブラウザ内で駆動する。
@@ -70,10 +78,20 @@ export function useWatchModeSimulation() {
 		clearTimer();
 	}, [clearTimer]);
 
+	/** 設定が不正な場合のエラー。フォーム入力の検証結果を UI へ返す */
+	const [configError, setConfigError] = useState<string | null>(null);
+
 	const initialize = useCallback(
 		(params: ExperimentConfigParams) => {
 			stop();
-			const config = ExperimentConfig.create(params);
+			const configResult = ExperimentConfig.create(params);
+			if (!configResult.success) {
+				setConfigError(CONFIG_ERROR_MESSAGES[configResult.error]);
+				return;
+			}
+			setConfigError(null);
+
+			const config = configResult.value;
 			// AI Decision は Route Handler を経由するため、API キーはクライアントへ渡らない
 			const engine = createWatchModeEngine(config, {
 				aiDecisionEnabled: config.aiDecisionEnabled,
@@ -143,6 +161,7 @@ export function useWatchModeSimulation() {
 
 	return {
 		view,
+		configError,
 		isRunning,
 		speed,
 		setSpeed,

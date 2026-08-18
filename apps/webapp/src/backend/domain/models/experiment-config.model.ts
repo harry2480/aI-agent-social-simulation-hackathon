@@ -1,4 +1,5 @@
 import { type CityLayoutConfig, DEFAULT_CITY_LAYOUT } from './city.model';
+import type { Result } from './result.model';
 import { DEFAULT_SLEEP_STATE_THRESHOLDS, type SleepStateThresholds } from './sleep-state.model';
 
 export type ShockTarget = 'none' | 'random' | 'driver' | 'manager';
@@ -43,8 +44,14 @@ export interface ExperimentConfigParams {
 	aiDecisionEnabled?: boolean;
 }
 
-const MAX_POPULATION = 500;
-const MAX_DAYS = 14;
+export const MAX_POPULATION = 500;
+export const MAX_DAYS = 14;
+
+export type ExperimentConfigError =
+	| 'SEED_NOT_INTEGER'
+	| 'POPULATION_OUT_OF_RANGE'
+	| 'DAYS_OUT_OF_RANGE'
+	| 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE';
 
 /**
  * 実験条件。比較実験ではこの中の Experimental Variable だけを変更し、
@@ -67,39 +74,48 @@ export class ExperimentConfig {
 		public readonly aiDecisionEnabled: boolean,
 	) {}
 
-	static create(params: ExperimentConfigParams): ExperimentConfig {
+	/**
+	 * 実験条件を検証して生成する。
+	 * ユーザー入力に対するドメインルール違反なので、例外ではなく Result で返す。
+	 */
+	static create(params: ExperimentConfigParams): Result<ExperimentConfig, ExperimentConfigError> {
 		if (!Number.isInteger(params.seed)) {
-			throw new Error(`ExperimentConfig: seed must be an integer, got ${params.seed}`);
+			return { success: false, error: 'SEED_NOT_INTEGER' };
 		}
 		if (params.population < 1 || params.population > MAX_POPULATION) {
-			throw new Error(`ExperimentConfig: population must be 1..${MAX_POPULATION}`);
+			return { success: false, error: 'POPULATION_OUT_OF_RANGE' };
 		}
 		if (params.days < 1 || params.days > MAX_DAYS) {
-			throw new Error(`ExperimentConfig: days must be 1..${MAX_DAYS}`);
+			return { success: false, error: 'DAYS_OUT_OF_RANGE' };
 		}
 		if (params.initialSleepDeprivedRate < 0 || params.initialSleepDeprivedRate > 1) {
-			throw new Error('ExperimentConfig: initialSleepDeprivedRate must be 0..1');
+			return { success: false, error: 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE' };
 		}
 
-		return new ExperimentConfig(
-			params.seed,
-			params.population,
-			params.days,
-			params.initialSleepDeprivedRate,
-			params.initialSleepDebtHours ?? 3,
-			params.shockTarget ?? 'none',
-			params.trafficLevel ?? 1,
-			params.intervention ?? null,
-			params.aiModel ?? null,
-			params.sleepStateThresholds ?? DEFAULT_SLEEP_STATE_THRESHOLDS,
-			params.cascadeThresholds ?? DEFAULT_CASCADE_THRESHOLDS,
-			params.cityLayout ?? DEFAULT_CITY_LAYOUT,
-			params.aiDecisionEnabled ?? false,
-		);
+		return {
+			success: true,
+			value: new ExperimentConfig(
+				params.seed,
+				params.population,
+				params.days,
+				params.initialSleepDeprivedRate,
+				params.initialSleepDebtHours ?? 3,
+				params.shockTarget ?? 'none',
+				params.trafficLevel ?? 1,
+				params.intervention ?? null,
+				params.aiModel ?? null,
+				params.sleepStateThresholds ?? DEFAULT_SLEEP_STATE_THRESHOLDS,
+				params.cascadeThresholds ?? DEFAULT_CASCADE_THRESHOLDS,
+				params.cityLayout ?? DEFAULT_CITY_LAYOUT,
+				params.aiDecisionEnabled ?? false,
+			),
+		};
 	}
 
 	/** 比較実験用に一部条件だけを差し替えた Config を作る */
-	withOverrides(overrides: Partial<ExperimentConfigParams>): ExperimentConfig {
+	withOverrides(
+		overrides: Partial<ExperimentConfigParams>,
+	): Result<ExperimentConfig, ExperimentConfigError> {
 		return ExperimentConfig.create({
 			seed: overrides.seed ?? this.seed,
 			population: overrides.population ?? this.population,

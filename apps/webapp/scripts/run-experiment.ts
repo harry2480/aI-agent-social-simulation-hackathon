@@ -78,11 +78,13 @@ function parseArgs(): { kind: ExperimentKind; seeds: number } {
 }
 
 async function runOnce(params: ExperimentConfigParams): Promise<RunSummary> {
+	const configResult = ExperimentConfig.create(params);
+	if (!configResult.success) {
+		throw new Error(`invalid experiment config: ${configResult.error}`);
+	}
+
 	// Experiment Mode は Rule-based 固定。AI の非決定性を排除し、大量実行のコストを抑える
-	const engine = SimulationEngine.create(
-		ExperimentConfig.create(params),
-		new RuleBasedAiDecisionGateway(),
-	);
+	const engine = SimulationEngine.create(configResult.value, new RuleBasedAiDecisionGateway());
 	return engine.run(engine.initialize());
 }
 

@@ -1083,8 +1083,10 @@ export class SimulationEngine {
 			rsSeries.length === 0 ? 0 : rsSeries.reduce((sum, rs) => sum + rs, 0) / rsSeries.length;
 		const cascade = this.cascadeService.evaluate(state);
 
+		// latest には tick が含まれるが RunSummary は断面の時刻を持たないため、必要な項目だけを取る
+		const { tick: _tick, ...metrics } = latest;
 		return {
-			...latest,
+			...metrics,
 			peakRs,
 			averageRs,
 			cascadeOccurred: cascade.occurred,

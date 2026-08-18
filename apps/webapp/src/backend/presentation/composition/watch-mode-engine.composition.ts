@@ -47,6 +47,7 @@ export type {
 	SleepTransmission,
 } from '../../domain/models/simulation-state.model';
 export type {
+	ExperimentConfigError,
 	ExperimentConfigParams,
 	InterventionName,
 	ShockTarget,

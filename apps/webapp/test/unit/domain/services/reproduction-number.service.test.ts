@@ -1,14 +1,14 @@
 import { City } from '@/backend/domain/models/city.model';
-import { ExperimentConfig } from '@/backend/domain/models/experiment-config.model';
 import { SimulationClock } from '@/backend/domain/models/simulation-clock.model';
 import { SimulationState } from '@/backend/domain/models/simulation-state.model';
 import { CascadeService } from '@/backend/domain/services/cascade.service';
 import { ReproductionNumberService } from '@/backend/domain/services/reproduction-number.service';
 import { SeededRandomService } from '@/backend/domain/services/seeded-random.service';
 import { describe, expect, it } from 'vitest';
+import { createTestConfig } from '../../../helpers/experiment-config';
 
 function buildState(population: number): SimulationState {
-	const config = ExperimentConfig.create({
+	const config = createTestConfig({
 		seed: 1,
 		population,
 		days: 1,

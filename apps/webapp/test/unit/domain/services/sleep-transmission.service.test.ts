@@ -1,6 +1,5 @@
 import { Agent } from '@/backend/domain/models/agent.model';
 import { City } from '@/backend/domain/models/city.model';
-import { ExperimentConfig } from '@/backend/domain/models/experiment-config.model';
 import { SimulationClock } from '@/backend/domain/models/simulation-clock.model';
 import { SimulationEvent } from '@/backend/domain/models/simulation-event.model';
 import { SimulationState } from '@/backend/domain/models/simulation-state.model';
@@ -10,6 +9,7 @@ import {
 	SleepTransmissionService,
 } from '@/backend/domain/services/sleep-transmission.service';
 import { describe, expect, it } from 'vitest';
+import { createTestConfig } from '../../../helpers/experiment-config';
 
 const layout = {
 	residentialDistricts: 1,
@@ -22,7 +22,7 @@ const layout = {
 };
 
 function buildState(): SimulationState {
-	const config = ExperimentConfig.create({
+	const config = createTestConfig({
 		seed: 1,
 		population: 2,
 		days: 1,

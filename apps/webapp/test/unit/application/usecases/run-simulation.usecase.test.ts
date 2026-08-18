@@ -2,7 +2,6 @@ import {
 	RunSimulationUseCase,
 	buildRunPersistencePayload,
 } from '@/backend/application/usecases/run-simulation.usecase';
-import { ExperimentConfig } from '@/backend/domain/models/experiment-config.model';
 import type {
 	RunPersistencePayload,
 	SimulationRunRepository,
@@ -11,6 +10,7 @@ import type {
 import { SimulationEngine } from '@/backend/domain/services/simulation-engine.service';
 import { RuleBasedAiDecisionGateway } from '@/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
 import { describe, expect, it, vi } from 'vitest';
+import { createTestConfig } from '../../../helpers/experiment-config';
 
 /** DB へ触れないインメモリ実装。保存されたペイロードを検証できるようにする */
 class FakeSimulationRunRepository implements SimulationRunRepository {
@@ -35,7 +35,7 @@ class FakeSimulationRunRepository implements SimulationRunRepository {
 }
 
 function config() {
-	return ExperimentConfig.create({
+	return createTestConfig({
 		seed: 42,
 		population: 40,
 		days: 2,
@@ -96,7 +96,7 @@ describe('RunSimulationUseCase', () => {
 
 	it('onTick は Tick ごとに呼ばれる', async () => {
 		const onTick = vi.fn();
-		const shortConfig = ExperimentConfig.create({
+		const shortConfig = createTestConfig({
 			seed: 1,
 			population: 10,
 			days: 1,

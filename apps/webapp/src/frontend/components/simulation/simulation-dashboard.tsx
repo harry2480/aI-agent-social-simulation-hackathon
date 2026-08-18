@@ -71,8 +71,18 @@ const DEFAULT_FORM: FormState = {
 };
 
 export function SimulationDashboard() {
-	const { view, isRunning, speed, setSpeed, initialize, start, pause, stateRef, summarize } =
-		useWatchModeSimulation();
+	const {
+		view,
+		configError,
+		isRunning,
+		speed,
+		setSpeed,
+		initialize,
+		start,
+		pause,
+		stateRef,
+		summarize,
+	} = useWatchModeSimulation();
 	const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -301,7 +311,7 @@ export function SimulationDashboard() {
 					)}
 				</div>
 				<div className="flex min-h-0 flex-col gap-3">
-					<KpiPanel metrics={view?.metrics ?? null} population={form.population} />
+					<KpiPanel metrics={view?.metrics ?? null} population={state?.config.population ?? 0} />
 					<AgentDetailPanel
 						agent={selectedAgent}
 						sleepState={selectedAgent === null ? null : sleepStateOf(selectedAgent)}
@@ -309,6 +319,12 @@ export function SimulationDashboard() {
 					/>
 				</div>
 			</div>
+
+			{configError !== null ? (
+				<p role="alert" className="text-xs text-destructive">
+					{configError}
+				</p>
+			) : null}
 
 			{saveError !== null ? (
 				<p role="alert" className="text-xs text-destructive">

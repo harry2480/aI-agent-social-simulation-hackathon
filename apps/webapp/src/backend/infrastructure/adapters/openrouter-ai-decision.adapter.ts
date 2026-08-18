@@ -9,6 +9,13 @@ import type {
 
 export const DEFAULT_AI_MODEL = 'google/gemma-3-27b-it';
 
+/**
+ * 1 回の推論を打ち切るまでの時間（ミリ秒）。
+ * タイムアウトが無いと応答が返らないまま Tick が止まり、
+ * 「OpenRouter が失敗しても Simulation を完走させる」という要件を満たせない。
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const SYSTEM_PROMPT = `あなたはSLEEP CITYという仮想都市に住む一人の住民です。
 
 あなたは都市全体の状態を知りません。
@@ -32,6 +39,7 @@ export class OpenRouterAiDecisionGateway implements AiDecisionGateway {
 	constructor(
 		apiKey: string,
 		private readonly model: string = DEFAULT_AI_MODEL,
+		private readonly timeoutMs: number = REQUEST_TIMEOUT_MS,
 	) {
 		this.provider = createOpenAICompatible({
 			name: 'openrouter',
@@ -56,6 +64,7 @@ export class OpenRouterAiDecisionGateway implements AiDecisionGateway {
 			system: SYSTEM_PROMPT,
 			schema,
 			prompt: JSON.stringify({ agent: context.agent, situation: context.situation }),
+			abortSignal: AbortSignal.timeout(this.timeoutMs),
 		});
 
 		return { action: object.action, reason: object.reason, model: this.model };

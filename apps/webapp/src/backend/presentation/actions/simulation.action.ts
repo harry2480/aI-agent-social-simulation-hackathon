@@ -29,9 +29,14 @@ export interface CreateSimulationInput {
 export async function runSimulationAction(
 	input: CreateSimulationInput,
 ): Promise<{ runId: string | null; summary: RunSummary }> {
-	const config = ExperimentConfig.create(input);
+	const configResult = ExperimentConfig.create(input);
+	if (!configResult.success) {
+		// domain は Result を返すため、Application/Presentation 側で例外へ変換する
+		throw new Error(`invalid experiment config: ${configResult.error}`);
+	}
+
 	const useCase = createExperimentRunSimulationUseCase();
-	const result = await useCase.execute({ config, persist: true });
+	const result = await useCase.execute({ config: configResult.value, persist: true });
 
 	revalidatePath('/');
 	return { runId: result.runId, summary: result.summary };

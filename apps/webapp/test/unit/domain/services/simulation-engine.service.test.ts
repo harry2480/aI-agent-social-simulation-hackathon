@@ -1,11 +1,11 @@
-import { ExperimentConfig } from '@/backend/domain/models/experiment-config.model';
 import { MAX_EVENT_DEPTH } from '@/backend/domain/models/simulation-event.model';
 import { SimulationEngine } from '@/backend/domain/services/simulation-engine.service';
 import { RuleBasedAiDecisionGateway } from '@/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
 import { describe, expect, it } from 'vitest';
+import { createTestConfig } from '../../../helpers/experiment-config';
 
-function config(overrides: Partial<Parameters<typeof ExperimentConfig.create>[0]> = {}) {
-	return ExperimentConfig.create({
+function config(overrides: Partial<Parameters<typeof createTestConfig>[0]> = {}) {
+	return createTestConfig({
 		seed: 42,
 		population: 60,
 		days: 3,
