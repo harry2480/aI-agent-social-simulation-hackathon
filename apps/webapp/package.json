@@ -20,6 +20,7 @@
 	"dependencies": {
 		"@ai-sdk/openai-compatible": "^3.0.31",
 		"@prisma/client": "^6",
+		"@xyflow/react": "^12.11.3",
 		"ai": "^7.0.66",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2",

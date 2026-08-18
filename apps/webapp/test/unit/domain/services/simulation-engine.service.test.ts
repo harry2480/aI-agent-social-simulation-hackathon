@@ -78,10 +78,22 @@ describe('SimulationEngine', () => {
 	});
 
 	describe('Event の健全性', () => {
-		it('伝播 Depth は上限を超えない', async () => {
-			const { state } = await run();
+		it('同一 Tick 内の連鎖は伝播 Depth 上限を超えない', async () => {
+			const { state } = await run({ population: 300, days: 7 });
+
+			// 同一 Tick 内の原因のみを辿った連鎖長を測る。
+			// 日をまたいで積み上がるチェーン全体の長さは制限対象ではない
+			const sameTickDepth = new Map<string, number>();
 			for (const event of state.events) {
-				expect(event.depth).toBeLessThanOrEqual(MAX_EVENT_DEPTH);
+				const parentDepths = event.causedByEventIds
+					.map((causeId) => state.eventById(causeId))
+					.filter((cause) => cause !== undefined && cause.tick === event.tick)
+					.map((cause) => sameTickDepth.get(cause?.id ?? '') ?? 0);
+				sameTickDepth.set(event.id, parentDepths.length === 0 ? 0 : Math.max(...parentDepths) + 1);
+			}
+
+			for (const depth of sameTickDepth.values()) {
+				expect(depth).toBeLessThanOrEqual(MAX_EVENT_DEPTH);
 			}
 		});
 
