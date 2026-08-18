@@ -3,23 +3,25 @@ node_modules
 .DS_Store
 dist/
 .next/
-.env
-.env.local
-.env.*.local
 *.tsbuildinfo
 .turbo/
 coverage/
 .vercel/
-.terraform/
+
+# 環境変数（.env.example のみ追跡する）
+.env
+.env.*
+!.env.example
+
+# テスト成果物
 playwright-report/
 test-results/
-looper/output/
 .playwright-mcp/
-settings.local.json
 
 # Supabase local
 supabase/.temp/
 supabase/.branches/
 
+# ローカル設定
+settings.local.json
 .vscode/settings.json
-.vercel
