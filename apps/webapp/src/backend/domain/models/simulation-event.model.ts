@@ -25,6 +25,30 @@ export type EventType =
  */
 export const MAX_EVENT_DEPTH = 10;
 
+/** 都市内の Network 種別（要件定義 5 章） */
+export type NetworkName = 'transportation' | 'work' | 'household';
+
+const NETWORK_BY_EVENT_TYPE: Partial<Record<EventType, NetworkName>> = {
+	accident: 'transportation',
+	traffic_jam: 'transportation',
+	commute_delay: 'transportation',
+	late_arrival: 'transportation',
+	work_delay: 'work',
+	work_failure: 'work',
+	overtime: 'work',
+	delivery_delay: 'work',
+	store_delay: 'work',
+	household_delay: 'household',
+};
+
+/**
+ * その Event がどの Network 上の出来事かを返す。
+ * どの Network にも属さない Event（睡眠・判断など）は undefined。
+ */
+export function networkOfEventType(type: EventType): NetworkName | undefined {
+	return NETWORK_BY_EVENT_TYPE[type];
+}
+
 export interface EventImpact {
 	delayMinutes?: number;
 	sleepLossMinutes?: number;

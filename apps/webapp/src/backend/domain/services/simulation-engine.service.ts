@@ -997,24 +997,7 @@ export class SimulationEngine {
 
 	/** 初期 Shock（Patient Zero の設定）。Generation 0 として記録する */
 	private applyInitialShock(state: SimulationState): void {
-		if (this.config.shockTarget === 'none' || this.config.initialSleepDeprivedRate <= 0) {
-			return;
-		}
-
-		const candidates = state
-			.orderedAgents()
-			.filter((agent) => this.matchesShockTarget(agent))
-			.map((agent) => agent.id);
-		if (candidates.length === 0) {
-			return;
-		}
-
-		const targetCount = Math.max(
-			1,
-			Math.round(state.config.population * this.config.initialSleepDeprivedRate),
-		);
-		const selected = this.shockRng.shuffle(candidates).slice(0, targetCount);
-
+		const selected = this.selectPatientZeros(state);
 		for (const agentId of selected) {
 			const agent = state.agent(agentId);
 			agent.addSleepDebtHours(this.config.initialSleepDebtHours);
@@ -1022,6 +1005,37 @@ export class SimulationEngine {
 			agent.commitSleepStateTransition(this.config.sleepStateThresholds);
 			state.generations.set(agentId, 0);
 		}
+	}
+
+	/**
+	 * Patient Zero を選ぶ。
+	 * patientZeroAgentId が指定されていればその 1 人だけを起点にする
+	 * （Super-spreader 探索で Agent ごとの伝播力を測るため）。
+	 */
+	private selectPatientZeros(state: SimulationState): string[] {
+		if (this.config.patientZeroAgentId !== null) {
+			return state.agents.has(this.config.patientZeroAgentId)
+				? [this.config.patientZeroAgentId]
+				: [];
+		}
+
+		if (this.config.shockTarget === 'none' || this.config.initialSleepDeprivedRate <= 0) {
+			return [];
+		}
+
+		const candidates = state
+			.orderedAgents()
+			.filter((agent) => this.matchesShockTarget(agent))
+			.map((agent) => agent.id);
+		if (candidates.length === 0) {
+			return [];
+		}
+
+		const targetCount = Math.max(
+			1,
+			Math.round(state.config.population * this.config.initialSleepDeprivedRate),
+		);
+		return this.shockRng.shuffle(candidates).slice(0, targetCount);
 	}
 
 	private matchesShockTarget(agent: Agent): boolean {

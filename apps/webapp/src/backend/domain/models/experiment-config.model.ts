@@ -42,6 +42,12 @@ export interface ExperimentConfigParams {
 	cityLayout?: CityLayoutConfig;
 	/** AI Decision を有効にするか。Experiment Mode では false にして Rule-based で回す */
 	aiDecisionEnabled?: boolean;
+	/**
+	 * Patient Zero を 1 人に固定する。指定した場合は shockTarget と
+	 * initialSleepDeprivedRate による選定を行わない。
+	 * Super-spreader 探索で「この Agent が起点なら何人へ広がるか」を測るために使う。
+	 */
+	patientZeroAgentId?: string;
 }
 
 export const MAX_POPULATION = 500;
@@ -72,6 +78,7 @@ export class ExperimentConfig {
 		public readonly cascadeThresholds: CascadeThresholds,
 		public readonly cityLayout: CityLayoutConfig,
 		public readonly aiDecisionEnabled: boolean,
+		public readonly patientZeroAgentId: string | null,
 	) {}
 
 	/**
@@ -108,6 +115,7 @@ export class ExperimentConfig {
 				params.cascadeThresholds ?? DEFAULT_CASCADE_THRESHOLDS,
 				params.cityLayout ?? DEFAULT_CITY_LAYOUT,
 				params.aiDecisionEnabled ?? false,
+				params.patientZeroAgentId ?? null,
 			),
 		};
 	}
@@ -131,6 +139,10 @@ export class ExperimentConfig {
 			cascadeThresholds: overrides.cascadeThresholds ?? this.cascadeThresholds,
 			cityLayout: overrides.cityLayout ?? this.cityLayout,
 			aiDecisionEnabled: overrides.aiDecisionEnabled ?? this.aiDecisionEnabled,
+			patientZeroAgentId:
+				overrides.patientZeroAgentId !== undefined
+					? overrides.patientZeroAgentId
+					: (this.patientZeroAgentId ?? undefined),
 		});
 	}
 
