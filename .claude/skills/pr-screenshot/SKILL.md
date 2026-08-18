@@ -49,42 +49,40 @@ git diff --name-only develop...HEAD
 変更されたファイルパスから、影響を受けるUI画面を推定する:
 
 **推定ルール**:
-- `web/src/features/{feature}/` → その feature に対応するページ
-- `web/src/app/(main)/bills/` → 議案詳細ページ (`/bills/{id}`)
-- `web/src/app/(main)/page.tsx` → トップページ (`/`)
-- `web/src/app/(main)/kokkai/` → 国会会期ページ
-- `web/src/components/` → 影響範囲が広い。トップページ + 議案詳細を撮る
-- `admin/src/features/bills-edit/` → admin 議案編集ページ
-- `admin/src/features/bills/` → admin 議案一覧ページ
-- `web/src/app/globals.css` → トップページ + 議案詳細を撮る
-- `admin/src/app/` 配下 → 対応する admin ページ
+- `apps/webapp/src/app/page.tsx` → ダッシュボード (`/`)
+- `apps/webapp/src/app/globals.css` → ダッシュボード (`/`)
+- `apps/webapp/src/frontend/components/` 配下 → ダッシュボード (`/`)
+- `apps/webapp/src/frontend/hooks/` 配下 → ダッシュボード (`/`)
 
-feature名からページを特定する対応表:
-- `bills` → `/bills/{id}` (議案詳細)
-- `interview-config` → `/bills/{id}/interview` (インタビューLP)
-- `interview-session` → `/bills/{id}/interview/chat` (チャット)
-- `interview-report` → `/report/{reportId}` (レポート)
-- `bill-difficulty` → `/bills/{id}` (議案詳細)
+本アプリのページは `/` のみ。ダッシュボード上の以下のパネルが撮影対象になる:
+
+| 変更されたディレクトリ | 対象パネル |
+|---|---|
+| `components/city-map/` | 都市マップ |
+| `components/kpi/` | KPI パネル |
+| `components/timeline/` | イベントタイムライン |
+| `components/causal-graph/` | Causal Graph |
+| `components/agent-detail/` | Agent 詳細パネル（Agent クリックで開く） |
+| `components/simulation/` | ダッシュボード全体 |
+
+パネル単体が対象でも、まずダッシュボード全体を撮り、必要に応じて該当パネルへスクロール・
+クリックした状態を追加で撮る。
 
 **UIに関係しない変更のみの場合**（migration, test, server-only logic等）はスキップして終了。
 
 ### Step 2: 環境セットアップ
 
-worktreeのパスを特定し（現在のディレクトリが worktree であることを前提）、devサーバーを起動する:
+devサーバーを起動する:
 
 ```bash
 # Supabase が起動中か確認
-npx supabase status 2>&1 | head -5
+pnpm supabase status 2>&1 | head -5
 
-# シードデータを投入（新カラム等を反映）
-pnpm seed
+# シードデータを投入
+pnpm db:seed
 
-# devサーバー起動（バックグラウンド）
-# web のみ: ポート3000
-# admin も必要なら: ポート3001
-npx dotenv -e .env -- pnpm --filter web run dev &
-# admin が必要な場合:
-# npx dotenv -e .env -- pnpm --filter admin run dev &
+# devサーバー起動（バックグラウンド、ポート3000）
+pnpm dev &
 
 # サーバー起動待ち
 sleep 8
@@ -93,27 +91,19 @@ sleep 8
 サーバーが起動したら、使用するポートを確認する（3000が使用中なら別ポートが割り当てられる）:
 
 ```bash
-# 起動ログからポートを確認するか、curl で確認
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || curl -s -o /dev/null -w "%{http_code}" http://localhost:3002
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || curl -s -o /dev/null -w "%{http_code}" http://localhost:3001
 ```
 
 ### Step 3: スクリーンショット対象URLの構築
 
-seed投入後、DBから議案IDを取得してURLを構築する:
+本アプリはダッシュボード (`/`) の単一ページ構成のため、URL は固定。
 
 ```bash
-# 公開済み議案のIDを1件取得
-npx supabase db query "SELECT id::text FROM bills WHERE publish_status = 'published' LIMIT 1;"
+URL="http://localhost:${PORT}/"
 ```
 
-取得したIDを使い、Step 1 で特定したページのURLリストを作る。
-
-admin ページが対象の場合:
-```bash
-# admin にログインが必要（session cookie取得）
-# admin は Basic Auth やメールログインが必要なので、URL直アクセスで取れない場合がある
-# → admin はログインフローを agent-browser で実行してからスクショを撮る
-```
+Agent 詳細パネルや Causal Graph など、操作しないと現れない要素が対象の場合は
+Step 4 で `agent-browser` の `click` / `scroll` を使って状態を作ってから撮影する。
 
 ### Step 4: スクリーンショット撮影
 
@@ -140,18 +130,6 @@ agent-browser --session $SESSION screenshot /tmp/pr-screenshots/screenshot-1.png
 - ツールチップやホバー状態が必要な場合は `hover` してから撮る
 - スクロールが必要な場合は `scroll down` してから撮る
 - 撮影後は `Read` ツールで画像を確認し、正しく表示されているか検証する
-
-**admin ページのログインフロー**:
-```bash
-agent-browser --session $SESSION open "http://localhost:3001/login"
-agent-browser --session $SESSION snapshot -i
-# メールとパスワードを入力
-agent-browser --session $SESSION fill "@eX" "admin@example.com"
-agent-browser --session $SESSION fill "@eY" "admin123456"
-agent-browser --session $SESSION click "@eZ"  # ログインボタン
-agent-browser --session $SESSION wait 3000
-# ログイン後、目的のページに遷移
-```
 
 ### Step 5: R2 アップロード
 
@@ -226,7 +204,5 @@ rm -rf /tmp/pr-screenshots
 
 - `agent-browser` CLI がインストール済みであること
 - `npx wrangler` が認証済みであること（未認証の場合、ユーザーに `! npx wrangler login` を促す）
-- Supabase がローカルで起動中であること（`npx supabase start`）
-- seed データには固定IDがないため、DBクエリでIDを取得する
+- Supabase がローカルで起動中であること（`pnpm supabase start`）
 - Next.js の `unstable_cache` により、seed直後でもキャッシュが効く場合がある。`.next` フォルダ削除 + サーバー再起動で解決する
-- admin ページは認証が必要。seed データの `admin@example.com / admin123456` でログインする

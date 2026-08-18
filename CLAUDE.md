@@ -1,4 +1,11 @@
-# Product Starter
+# SLEEP CITY 2.0
+
+AIマルチエージェント都市シミュレーション。睡眠不足が交通・労働・物流・家庭を介して伝播し、
+都市内で自己増殖する **Sleep Cascade** を観測・分析する仮想実験環境。
+
+シミュレーションの物理法則（事故発生・移動時間・渋滞・Sleep Debt・Fatigue・確率計算）は
+domain 層の決定論的ロジックが担い、**AI は Agent の意味的な意思決定のみ**を担当する。
+シード値を固定すれば実験は再現可能。要件の詳細は `docs/要件定義.md` を参照。
 
 ## 使い方（利用者向け）
 
@@ -87,7 +94,12 @@ src/backend/
 
 詳細な設計ルールは必要に応じて docs/ を読むこと:
 
-- docs/architecture.md — DDD 4層・依存ルール・命名規約
-- docs/frontend.md — フロントエンド規約（データフロー・UI スタック）
-- docs/infrastructure.md — インフラ規約（monorepo・デプロイ・DB・Stub パターン）
-- docs/quality.md — テスト方針・verify コマンド
+- docs/要件定義.md — SLEEP CITY 2.0 の要件定義書
+- docs/アーキテクチャ.md — DDD 4層・依存ルール・命名規約
+- docs/フロントエンド規約.md — フロントエンド規約（データフロー・UI スタック）
+- docs/フロントエンドアーキテクチャ.md — フロントエンドの構成詳細
+- docs/リポジトリ層設計規約.md — Repository の設計規約
+- docs/インフラストラクチャ規約.md — インフラ規約（monorepo・デプロイ・DB・Stub パターン）
+- docs/テストガイドライン.md — Unit / Integration の責務分担
+- docs/品質チェック・テスト規約.md — テスト方針・verify コマンド
+- docs/スタイルガイド.md — スタイル規約

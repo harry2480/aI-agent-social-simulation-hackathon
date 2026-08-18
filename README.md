@@ -1,103 +1,131 @@
-# スターターテンプレート
+# SLEEP CITY 2.0
 
-Claude Code や GitHub Copilot などの AI エージェントへの指示だけで高品質なプロダクトを構築できるスターターキットです。
-また、本リポジトリは**プロジェクト横断で利用可能なドキュメントテンプレート**や**AIエージェント向けの共通スキル・コマンド**を集約するハブとしても機能しています。
+AIマルチエージェント都市シミュレーション。睡眠不足が交通・労働・物流・家庭を介して他者へ伝播し、都市内で自己増殖する **Sleep Cascade** を観測・分析するための仮想実験環境です。
 
-## ハーネスエンジニアリングとは
+現実都市を正確に予測するものではなく、**「睡眠不足は都市内で伝播するか」という仮説を検証するための実験装置**として設計されています。
 
-このスターターキットは、**ハーネスエンジニアリング**の考え方に基づいて設計されています。
+## 何を調べるのか
 
-ハーネスエンジニアリングとは、AIエージェントが正しく力を発揮できるように情報やルールを整えることを指します。`CLAUDE.md` による共通ルールの注入、Skills（スラッシュコマンド）による定型作業の標準化、dependency-cruiser による依存方向の機械的な検証など、**複数のガードレールを多重に敷くことで、AIが書くコードの品質を構造的に担保**します。
+- Sleep Cascade が継続的に拡大する条件は存在するか
+- 睡眠不足が自己増殖し始める臨界点は存在するか
+- どの人物・職業・ネットワーク構造が伝播を増幅するか（Super-spreader）
+- どの介入施策が Sleep Cascade を抑制するか
+- AIエージェントの意思決定が都市全体の創発現象にどの程度影響するか
 
-これにより、AIエージェントを複数セッション並列で回しても、設計が崩れにくい開発が可能になります。
+## シミュレーション諸元
 
-詳しい背景と実践事例については、以下の記事をご覧ください。
+| 項目 | 標準 | 最大 |
+|---|---|---|
+| Agent 数 | 300人 | 500人 |
+| Simulation 期間 | 7日間 | 14日間 |
+| 1 Tick | 15分 | — |
 
-### このスターターキットに組み込まれたガードレール
+## 主な機能
 
-| ガードレール | 仕組み |
-|---|---|
-| **設計ルールの注入** | `CLAUDE.md` や `docs/templates/` 配下にアーキテクチャ・命名規約・依存ルールを明文化し、AIにコンテキストを供給 |
-| **共通Skillsとプロンプト** | `.claude/skills/` や `.claude/commands/` にプロジェクト横断の定型作業コマンドを集約し、品質のばらつきを抑制 |
-| **依存方向の機械的検証** | dependency-cruiser で「domain は外部に依存しない」等のルールを CI で自動チェック |
-| **レイヤー別テスト戦略** | domain/application は Unit テスト、infrastructure は Integration テスト。テスト方針もドキュメント化 |
-| **統合CI/CD** | `.github/workflows/` に集約されたワークフローにより、型チェックやlint、テストを一元的に自動化 |
+- **Watch Mode** — 都市マップ上で Agent の状態遷移をリアルタイム観測。KPI パネル、イベントタイムライン、Agent 詳細パネル
+- **Causal Graph** — 「誰の睡眠不足が誰に伝播したか」の因果関係を有向グラフで可視化
+- **Experiment Mode** — Multi-seed / Sweep によるバッチ実験。実効再生産数 Rs や介入効果を定量比較
+- **Super-spreader Explorer** — 伝播を最も増幅する Agent 属性の探索
 
-## テンプレートとドキュメント管理
+## 技術スタック
 
-本リポジトリの `docs/` には、新しいプロジェクトを立ち上げる際や新しい機能を設計する際にそのまま使える汎用テンプレートが用意されています。
-AIに「`docs/` の〇〇を使って新しい機能の要件定義をして」と指示するだけで、ベストプラクティスに基づいた仕様書が生成されます。
+- Next.js 15 (App Router) / React 19 / TypeScript
+- Prisma + PostgreSQL (Supabase)
+- shadcn/ui + Tailwind CSS v4 / @xyflow/react
+- Vercel AI SDK + OpenRouter
+- Vitest / dependency-cruiser / Biome
 
-**収録テンプレートの例:**
-- アーキテクチャ設計規約
-- フロントエンド規約
-- スタイルガイド
-- 品質チェック・テスト規約
-- AIチャット機能要件定義 / 実装計画
-- AIエージェント運用ガイド
+シミュレーションの物理法則（事故発生・移動時間・渋滞・Sleep Debt・Fatigue・確率計算）は
+すべて domain 層の決定論的なロジックが担い、**AI は Agent の意味的な意思決定のみ**を担当します。
+これによりシード値を固定すれば実験が再現可能になります。
 
-## 技術スタック (標準構成)
+## セットアップ
 
-- Next.js 15 (App Router) + Vercel
-- Supabase PostgreSQL + Prisma
-- shadcn/ui + Tailwind CSS
-- vitest + dependency-cruiser
-- Biome (lint/format)
-- AIツール: Vercel AI SDK, Streamdown
-
-## はじめかた
-
-### セットアップ
-
-AIエージェント（Claude Code 等）を開き、`/init-pj` を実行してください。前提ツールのインストールからDB構築まで自動で行います。
-
-## 使い方
-
-AIに自然言語で指示するだけで、テンプレートやルールに沿った機能追加が可能です。
-
-**コマンド例:**
-```
-「ユーザー管理機能を作って」
-「お気に入り機能を追加して」
-「/articles ページを作って」
-「○○テーブルにstatusカラムを追加して」
-「このエラーを直して: [エラーメッセージ]」
+```sh
+pnpm install
 ```
 
-## 開発コマンド一覧
+`apps/webapp/.env.local` を作成し、下記の環境変数を設定します。
+
+```sh
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
+OPENROUTER_API_KEY="sk-or-..."   # 任意
+```
+
+```sh
+pnpm db:migrate
+pnpm dev
+```
+
+### 環境変数
+
+| 変数 | 必須 | 内容 |
+|---|---|---|
+| `DATABASE_URL` | ✅ | PostgreSQL 接続文字列（Prisma 用） |
+| `DIRECT_URL` | ✅ | マイグレーション用の直接接続文字列 |
+| `OPENROUTER_API_KEY` | — | 未設定時は Rule-based 実装へ自動フォールバック |
+| `AI_MODEL` | — | 既定値 `google/gemma-3-27b-it` |
+
+`OPENROUTER_API_KEY` を設定しなくてもシミュレーション自体は動作します（AI の意思決定がルールベースに置き換わります）。
+
+## 開発コマンド
 
 | コマンド | 内容 |
 |---|---|
 | `pnpm dev` | 開発サーバー起動 |
-| `pnpm verify` | 品質チェック（lint → typecheck → test → depcruise） |
-| `pnpm test:unit` | Unit テスト実行 |
-| `pnpm lint:fix` | 自動フォーマット・Lint適用 |
-| `pnpm db:migrate` | DBマイグレーション |
+| `pnpm verify` | 品質チェック（lint → prisma generate → typecheck → unit test → depcruise） |
+| `pnpm test:unit` | Unit テスト |
+| `pnpm test:integration` | Integration テスト（要 `DATABASE_URL`, `INTEGRATION_TEST=true`） |
+| `pnpm lint:fix` | 自動フォーマット |
+| `pnpm db:migrate` | マイグレーション作成・適用 |
 | `pnpm knip` | 未使用コード検出 |
+
+### バッチ実験
+
+Vercel Function の実行時間上限に当たるため、重いバッチはスクリプトで実行します。
+
+```sh
+pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=shock-comparison --seeds=10
+pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=critical-point --seeds=10
+pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
+pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
+```
+
+`DATABASE_URL` が未設定の場合は DB へ保存せず、集計結果を標準出力に出します。
 
 ## プロジェクト構成
 
 ```text
-starter-templete/
-├── .claude/                # プロジェクト横断のAI SkillsとCommands
-├── .github/workflows/      # 統合CI/CDワークフロー（型チェック、ビルド、テスト等）
-├── docs/                   # プロジェクト横断で使えるドキュメント・定義テンプレート
-└── apps/webapp/src/        # メインアプリケーション
-    ├── app/                # ページ（Next.js App Router）
-    ├── backend/            # バックエンド全体
-    │   ├── application/    # ユースケース
-    │   ├── domain/         # ビジネスルール（モデル、インターフェース）
-    │   ├── infrastructure/ # DB・外部API実装
-    │   └── presentation/   # DI組み立て、データ取得、Server Actions
-    ├── frontend/           # フロントエンド・UI全体
-    └── lib/                # 共有ライブラリ
+├── .claude/                # AI エージェント向け Skills / Commands
+├── .github/workflows/      # CI（lint・型・テスト・依存方向・ビルド・カバレッジ）
+├── docs/                   # 要件定義・設計規約・実装計画
+├── supabase/               # Supabase ローカル設定
+└── apps/webapp/
+    ├── prisma/             # スキーマ・マイグレーション・シード
+    ├── scripts/            # バッチ実験ランナー
+    └── src/
+        ├── app/            # ページと Route Handler
+        ├── backend/
+        │   ├── domain/         # ビジネスルール（Simulation Engine 本体）
+        │   ├── application/    # UseCase
+        │   ├── infrastructure/ # Prisma / OpenRouter 実装
+        │   └── presentation/   # DI 組み立て・loaders・Server Actions
+        └── frontend/       # UI コンポーネント・hooks
 ```
 
-## サンプル実装について
+依存方向は `presentation → application → domain ← infrastructure` に固定され、
+dependency-cruiser により CI で機械的に検証されます。
 
-初期状態では Claude API を使ったジョーク生成機能がサンプルとして含まれています。
-`ANTHROPIC_API_KEY` を設定すると API 経由で動作し、未設定の場合は Stub（固定値）で動作します。
+## ドキュメント
 
-```bash
-echo 'ANTHROPIC_API_KEY="your-api-key"' >> apps/webapp/.env.local
-```
+| ファイル | 内容 |
+|---|---|
+| `docs/要件定義.md` | 本システムの要件定義書 |
+| `docs/サービスコンセプト.md` | コンセプト |
+| `docs/アーキテクチャ.md` | DDD 4層の依存ルール |
+| `docs/フロントエンド規約.md` | データフロー・UI スタック |
+| `docs/テストガイドライン.md` | Unit / Integration の責務分担 |
+| `docs/実装計画.md` | AI Agent Decision 機能の実装計画 |
+
+設計ルールの詳細は `CLAUDE.md` および `AGENTS.md` を参照してください。

@@ -62,4 +62,19 @@ DDD 4層アーキテクチャに従い、以下のファイルを一括生成す
 
 ## サンプル（参考）
 
-既存の Joke 機能（`joke.model.ts`, `generate-joke.usecase.ts` 等）を参考にする。
+既存の Simulation 機能を参考にする。DDD 4層が一通り揃っている実装例:
+
+| 層 | ファイル |
+|---|---|
+| domain / model | `src/backend/domain/models/simulation-state.model.ts` |
+| domain / service | `src/backend/domain/services/simulation-engine.service.ts` |
+| domain / repository | `src/backend/domain/repositories/simulation-run.repository.ts` |
+| application | `src/backend/application/usecases/run-simulation.usecase.ts` |
+| infrastructure | `src/backend/infrastructure/repositories/prisma-simulation-run.repository.ts` |
+| presentation | `src/backend/presentation/composition/simulation.composition.ts` |
+| presentation | `src/backend/presentation/loaders/simulation.loader.ts` |
+| presentation | `src/backend/presentation/actions/simulation.action.ts` |
+
+外部 API の Gateway + Stub 切り替えパターンは、AI Decision 機能を参考にする:
+`domain/gateways/ai-decision.gateway.ts`、`infrastructure/adapters/openrouter-ai-decision.adapter.ts`、
+`infrastructure/adapters/rule-based-ai-decision.adapter.ts`、`presentation/composition/decision.composition.ts`
