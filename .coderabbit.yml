@@ -19,11 +19,11 @@ reviews:
       - "dependabot"
       - "renovate"
   path_filters:
-    - "admin/**"
-    - "web/**"
-    - "packages/**"
+    # レビュー対象（本リポジトリの実構成に合わせる）
+    - "apps/**"
     - "supabase/**"
-    - "docs/**"
+    - ".github/**"
+    # 除外
     - "!**/*.md"
     - "!**/*.mdx"
     - "!**/*.svg"
@@ -35,6 +35,7 @@ reviews:
     - "!**/pnpm-lock.yaml"
     - "!**/yarn.lock"
     - "!**/package-lock.json"
+    - "!**/prisma/migrations/**"
     - "!**/dist/**"
     - "!**/.next/**"
     - "!**/coverage/**"

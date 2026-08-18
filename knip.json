@@ -3,6 +3,7 @@
 	"ignoreDependencies": ["supabase", "vercel"],
 	"workspaces": {
 		"apps/webapp": {
+			"entry": ["scripts/*.ts"],
 			"ignoreDependencies": ["postcss", "postcss-load-config"],
 			"ignore": ["src/frontend/components/ui/**"]
 		}
