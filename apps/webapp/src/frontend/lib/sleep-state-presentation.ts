@@ -57,13 +57,11 @@ export function sleepStatePresentation(state: SleepStateName): SleepStatePresent
 	return PRESENTATIONS[state];
 }
 
-/** Canvas 描画用に CSS 変数を実際の色文字列へ解決する */
-export function resolveSleepStateColors(element: HTMLElement): Record<SleepStateName, string> {
-	const styles = getComputedStyle(element);
-	const resolved = {} as Record<SleepStateName, string>;
+/** 睡眠状態ごとの CSS 変数名。Canvas 描画側が実際の色へ解決するために使う */
+export function sleepStateColorVars(): Record<SleepStateName, string> {
+	const vars = {} as Record<SleepStateName, string>;
 	for (const state of SLEEP_STATE_ORDER) {
-		const value = styles.getPropertyValue(PRESENTATIONS[state].colorVar).trim();
-		resolved[state] = value.length > 0 ? value : '#888888';
+		vars[state] = PRESENTATIONS[state].colorVar;
 	}
-	return resolved;
+	return vars;
 }

@@ -16,9 +16,8 @@ coverage:
         target: 80%
         threshold: 0%
 
-# 計測対象から除外するパス。
-# Unit テストの対象は domain + application（docs/テストガイドライン.md）に合わせる。
-# infrastructure は Integration テスト、presentation / frontend は E2E・手動確認の担当。
+# 計測対象から除外するパス。vitest.config.ts の coverage.exclude と揃える。
+# 除外するのは Unit テストで到達できないものだけに限る。
 ignore:
   - "**/*.test.ts"
   - "**/*.d.ts"
@@ -26,16 +25,21 @@ ignore:
   - "apps/webapp/prisma/**"
   - "apps/webapp/scripts/**"
   - "apps/webapp/*.config.*"
-  - "apps/webapp/src/app/**"
-  - "apps/webapp/src/frontend/**"
-  - "apps/webapp/src/lib/**"
-  - "apps/webapp/src/backend/infrastructure/**"
-  - "apps/webapp/src/backend/presentation/**"
   # 実行コードを持たない型・interface のみのファイル
   - "apps/webapp/src/backend/domain/repositories/**"
   - "apps/webapp/src/backend/domain/gateways/ai-decision.gateway.ts"
   - "apps/webapp/src/backend/domain/models/metrics.model.ts"
   - "apps/webapp/src/backend/domain/models/result.model.ts"
+  # DB 接続が必要。Integration テストの担当（docs/テストガイドライン.md）
+  - "apps/webapp/src/backend/infrastructure/db/**"
+  - "apps/webapp/src/backend/infrastructure/repositories/**"
+  - "apps/webapp/src/backend/presentation/composition/simulation.composition.ts"
+  - "apps/webapp/src/backend/presentation/loaders/**"
+  - "apps/webapp/src/backend/presentation/actions/**"
+  # ブラウザ描画が必要。E2E の担当
+  - "apps/webapp/src/app/**"
+  - "apps/webapp/src/frontend/components/**"
+  - "apps/webapp/src/frontend/hooks/**"
 
 # PR にカバレッジコメントを投稿
 comment:

@@ -15,10 +15,8 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'lcov'],
-			// Unit テストの対象は domain + application（docs/テストガイドライン.md）。
-			// infrastructure は Integration テスト、presentation と frontend は
-			// E2E / 手動確認の担当なのでカバレッジ計測の対象外とする
-			include: ['src/backend/domain/**/*.ts', 'src/backend/application/**/*.ts'],
+			// src 全体を対象とし、Unit テストで到達できないものだけを除外する
+			include: ['src/**/*.ts', 'src/**/*.tsx'],
 			exclude: [
 				'src/**/*.d.ts',
 				'src/**/*.test.ts',
@@ -27,6 +25,16 @@ export default defineConfig({
 				'src/backend/domain/gateways/ai-decision.gateway.ts',
 				'src/backend/domain/models/metrics.model.ts',
 				'src/backend/domain/models/result.model.ts',
+				// DB 接続が必要。Integration テストの担当（docs/テストガイドライン.md）
+				'src/backend/infrastructure/db/**',
+				'src/backend/infrastructure/repositories/**',
+				'src/backend/presentation/composition/simulation.composition.ts',
+				'src/backend/presentation/loaders/**',
+				'src/backend/presentation/actions/**',
+				// ブラウザ描画が必要。E2E の担当
+				'src/app/**',
+				'src/frontend/components/**',
+				'src/frontend/hooks/**',
 			],
 		},
 	},
