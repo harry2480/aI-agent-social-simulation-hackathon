@@ -15,8 +15,19 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'lcov'],
-			include: ['src/**/*.ts'],
-			exclude: ['src/**/*.d.ts', 'src/**/*.test.ts'],
+			// Unit テストの対象は domain + application（docs/テストガイドライン.md）。
+			// infrastructure は Integration テスト、presentation と frontend は
+			// E2E / 手動確認の担当なのでカバレッジ計測の対象外とする
+			include: ['src/backend/domain/**/*.ts', 'src/backend/application/**/*.ts'],
+			exclude: [
+				'src/**/*.d.ts',
+				'src/**/*.test.ts',
+				// 実行コードを持たない型・interface のみのファイル
+				'src/backend/domain/repositories/**',
+				'src/backend/domain/gateways/ai-decision.gateway.ts',
+				'src/backend/domain/models/metrics.model.ts',
+				'src/backend/domain/models/result.model.ts',
+			],
 		},
 	},
 	resolve: {

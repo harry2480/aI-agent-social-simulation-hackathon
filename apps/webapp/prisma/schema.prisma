@@ -8,11 +8,178 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model Joke {
-  id        String   @id @default(cuid())
-  theme     String
-  content   String
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+/// 実験定義。比較実験の条件セットを保持する
+model Experiment {
+  id         String   @id @default(cuid())
+  name       String
+  kind       String
+  /// ExperimentConfig のスナップショット。設定変更が過去の実験結果に影響しないようにする
+  configJson Json     @map("config_json")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
-  @@map("jokes")
+  runs    SimulationRun[]
+  results ExperimentResult[]
+
+  @@map("experiments")
+}
+
+/// 単一 Run のメタ情報と結果サマリ
+model SimulationRun {
+  id           String    @id @default(cuid())
+  experimentId String?   @map("experiment_id")
+  seed         Int
+  population   Int
+  days         Int
+  intervention String?
+  aiModel      String?   @map("ai_model")
+  status       String
+  configJson   Json      @map("config_json")
+  summaryJson  Json?     @map("summary_json")
+  startedAt    DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz()
+
+  experiment Experiment? @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  agents    Agent[]
+  events    Event[]
+  metrics   Metric[]
+  decisions AgentDecision[]
+
+  @@index([experimentId])
+  @@map("simulation_runs")
+}
+
+/// Run 内の Agent 属性スナップショット
+model Agent {
+  id                   String  @id @default(cuid())
+  runId                String  @map("run_id")
+  agentKey             String  @map("agent_key")
+  role                 String
+  homeId               String  @map("home_id")
+  workplaceId          String? @map("workplace_id")
+  sleepNeedHours       Float   @map("sleep_need_hours")
+  responsibility       Float
+  riskTolerance        Float   @map("risk_tolerance")
+  cooperativeness      Float
+  familyResponsibility Float   @map("family_responsibility")
+  finalSleepDebtHours  Float   @map("final_sleep_debt_hours")
+  finalFatigue         Float   @map("final_fatigue")
+  finalStress          Float   @map("final_stress")
+  finalSleepState      String  @map("final_sleep_state")
+
+  run SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  relationships AgentRelationship[] @relation("AgentRelationshipFrom")
+  relatedFrom   AgentRelationship[] @relation("AgentRelationshipTo")
+  decisions     AgentDecision[]
+
+  @@unique([runId, agentKey])
+  @@index([runId])
+  @@map("agents")
+}
+
+/// 家族・上司部下・同僚などの関係
+model AgentRelationship {
+  id          String @id @default(cuid())
+  fromAgentId String @map("from_agent_id")
+  toAgentId   String @map("to_agent_id")
+  kind        String
+  strength    Float  @default(1)
+
+  fromAgent Agent @relation("AgentRelationshipFrom", fields: [fromAgentId], references: [id], onDelete: Cascade)
+  toAgent   Agent @relation("AgentRelationshipTo", fields: [toAgentId], references: [id], onDelete: Cascade)
+
+  @@index([fromAgentId])
+  @@index([toAgentId])
+  @@map("agent_relationships")
+}
+
+/// 重要 Event
+model Event {
+  id         String   @id @default(cuid())
+  runId      String   @map("run_id")
+  eventKey   String   @map("event_key")
+  tick       Int
+  type       String
+  actorKey   String?  @map("actor_key")
+  targetKeys String[] @map("target_keys")
+  depth      Int
+  impactJson Json     @map("impact_json")
+
+  run SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  outgoingEdges CausalEdge[] @relation("CausalEdgeFrom")
+  incomingEdges CausalEdge[] @relation("CausalEdgeTo")
+
+  @@unique([runId, eventKey])
+  @@index([runId, tick])
+  @@map("events")
+}
+
+/// Event 間の因果エッジ
+model CausalEdge {
+  id           String @id @default(cuid())
+  fromEventId  String @map("from_event_id")
+  toEventId    String @map("to_event_id")
+  contribution Float  @default(1)
+
+  fromEvent Event @relation("CausalEdgeFrom", fields: [fromEventId], references: [id], onDelete: Cascade)
+  toEvent   Event @relation("CausalEdgeTo", fields: [toEventId], references: [id], onDelete: Cascade)
+
+  @@index([fromEventId])
+  @@index([toEventId])
+  @@map("causal_edges")
+}
+
+/// AI / Rule-based の判断結果と理由
+model AgentDecision {
+  id          String  @id @default(cuid())
+  runId       String  @map("run_id")
+  agentId     String? @map("agent_id")
+  tick        Int
+  action      String
+  reason      String
+  model       String
+  contextJson Json    @map("context_json")
+
+  run   SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agent Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([runId, tick])
+  @@map("agent_decisions")
+}
+
+/// サンプリング間隔ごとの KPI 時系列
+model Metric {
+  id           String @id @default(cuid())
+  runId        String @map("run_id")
+  tick         Int
+  snapshotJson Json   @map("snapshot_json")
+
+  run SimulationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, tick])
+  @@index([runId])
+  @@map("metrics")
+}
+
+/// Run 横断の集計（Cascade Probability、平均・分散）
+model ExperimentResult {
+  id                    String   @id @default(cuid())
+  experimentId          String   @map("experiment_id")
+  label                 String
+  runCount              Int      @map("run_count")
+  cascadeProbability    Float    @map("cascade_probability")
+  averageRs             Float    @map("average_rs")
+  peakRs                Float    @map("peak_rs")
+  averageReach          Float    @map("average_reach")
+  totalSleepLossMinutes Float    @map("total_sleep_loss_minutes")
+  standardDeviation     Float    @map("standard_deviation")
+  aggregateJson         Json     @map("aggregate_json")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  experiment Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId])
+  @@map("experiment_results")
 }

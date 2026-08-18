@@ -16,18 +16,26 @@ coverage:
         target: 80%
         threshold: 0%
 
-# 計測対象から除外するパス
+# 計測対象から除外するパス。
+# Unit テストの対象は domain + application（docs/テストガイドライン.md）に合わせる。
+# infrastructure は Integration テスト、presentation / frontend は E2E・手動確認の担当。
 ignore:
   - "**/*.test.ts"
   - "**/*.d.ts"
   - "apps/webapp/test/**"
   - "apps/webapp/prisma/**"
+  - "apps/webapp/scripts/**"
   - "apps/webapp/*.config.*"
-  - "apps/webapp/src/app/**/page.tsx"
-  - "apps/webapp/src/app/**/layout.tsx"
-  - "apps/webapp/src/app/**/loading.tsx"
-  - "apps/webapp/src/app/**/not-found.tsx"
-  - "apps/webapp/src/app/**/error.tsx"
+  - "apps/webapp/src/app/**"
+  - "apps/webapp/src/frontend/**"
+  - "apps/webapp/src/lib/**"
+  - "apps/webapp/src/backend/infrastructure/**"
+  - "apps/webapp/src/backend/presentation/**"
+  # 実行コードを持たない型・interface のみのファイル
+  - "apps/webapp/src/backend/domain/repositories/**"
+  - "apps/webapp/src/backend/domain/gateways/ai-decision.gateway.ts"
+  - "apps/webapp/src/backend/domain/models/metrics.model.ts"
+  - "apps/webapp/src/backend/domain/models/result.model.ts"
 
 # PR にカバレッジコメントを投稿
 comment:
