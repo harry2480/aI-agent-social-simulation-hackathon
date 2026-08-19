@@ -7,10 +7,16 @@
  * 使い方:
  *   pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
  *   pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts --population=300 --days=7 --top=10
+ *
+ * DATABASE_URL が設定されていれば Stage 2 のランキングを Experiment として保存し、
+ * `/super-spreader` から参照できるようにする。未設定なら標準出力のみ。
  */
 import { ExploreSuperSpreaderUseCase } from '../src/backend/application/usecases/explore-super-spreader.usecase';
 import { ExperimentConfig } from '../src/backend/domain/models/experiment-config.model';
 import { RuleBasedAiDecisionGateway } from '../src/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
+
+/** Stage 2 で使う Seed 群。保存する config と実行条件を一致させるため 1 箇所に置く */
+const STAGE2_SEEDS = [1, 2, 3];
 
 function arg(name: string, fallback: number): number {
 	const raw = process.argv
@@ -50,7 +56,7 @@ async function main(): Promise<void> {
 		baseConfig: configResult.value,
 		stage1AgentLimit: Number.isFinite(limit) ? limit : undefined,
 		stage2TopN: topN,
-		stage2Seeds: [1, 2, 3],
+		stage2Seeds: STAGE2_SEEDS,
 		onProgress: ({ stage, done, total }) => {
 			if (done % 25 === 0 || done === total) {
 				console.log(`  stage${stage}: ${done}/${total}`);
@@ -98,6 +104,39 @@ async function main(): Promise<void> {
 			`  networks=${spread} n=${String(values.length).padStart(3)} avg=${average.toFixed(2)}`,
 		);
 	}
+
+	if (process.env.DATABASE_URL === undefined) {
+		console.log('\n[super-spreader] DATABASE_URL 未設定のため保存をスキップしました');
+		return;
+	}
+
+	// 保存は infrastructure を直接使わず composition 経由で解決する
+	const { experimentRepository } = await import(
+		'../src/backend/presentation/composition/simulation.composition'
+	);
+	const experimentId = await experimentRepository.create({
+		name: `super-spreader (population ${population} / ${days} days)`,
+		kind: 'super-spreader',
+		config: { population, days, topN, stage2Seeds: STAGE2_SEEDS },
+	});
+	// ランキング 1 行を 1 結果として保存する。順位は配列の並びで保持される
+	await experimentRepository.saveResults(
+		experimentId,
+		result.stage2.map((score) => ({
+			label: score.agentId,
+			runCount: score.runCount,
+			cascadeProbability: score.cascadeProbability,
+			averageRs: score.individualRs,
+			// ランキングは Agent 単位の指標で平均と Peak を分けて持たないため、同じ値を入れる
+			peakRs: score.individualRs,
+			averageReach: score.attributableReach,
+			totalSleepLossMinutes: score.totalSleepLossMinutes,
+			standardDeviation: 0,
+			// 画面が必要とする Role / Cascade Depth / Cross-network Spread はここへ入れる
+			aggregate: score,
+		})),
+	);
+	console.log(`\n[super-spreader] saved: experimentId=${experimentId}`);
 }
 
 main().catch((error: unknown) => {

@@ -34,6 +34,7 @@ import {
 	useWatchModeSimulation,
 } from '@/frontend/hooks/use-watch-mode-simulation';
 import { Pause, Play, RotateCcw, Save } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const SPEEDS: PlaybackSpeed[] = [1, 4, 8];
@@ -73,7 +74,35 @@ const DEFAULT_FORM: FormState = {
 	aiDecisionEnabled: false,
 };
 
-export function SimulationDashboard() {
+export interface ReplaySource {
+	runId: string;
+	label: string;
+	params: ExperimentConfigParams;
+}
+
+/** 保存された Config をフォームの初期値へ戻す */
+function formFromParams(params: ExperimentConfigParams): FormState {
+	return {
+		seed: params.seed,
+		population: params.population,
+		days: params.days,
+		initialSleepDeprivedRate: params.initialSleepDeprivedRate ?? 0,
+		shockTarget: params.shockTarget ?? 'none',
+		intervention: params.intervention ?? 'none',
+		aiDecisionEnabled: params.aiDecisionEnabled === true,
+	};
+}
+
+interface SimulationDashboardProps {
+	/**
+	 * Replay 対象の Run。
+	 * Simulation Engine は同一 Seed・同一 Config なら同一結果になるため、
+	 * 保存された Event 列を再生するのではなく、同じ条件で再実行して観察する。
+	 */
+	replay?: ReplaySource;
+}
+
+export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 	const {
 		view,
 		configError,
@@ -86,7 +115,9 @@ export function SimulationDashboard() {
 		stateRef,
 		summarize,
 	} = useWatchModeSimulation();
-	const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+	const [form, setForm] = useState<FormState>(() =>
+		replay === undefined ? DEFAULT_FORM : formFromParams(replay.params),
+	);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [focusEventId, setFocusEventId] = useState<string | null>(null);
 	const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -94,6 +125,9 @@ export function SimulationDashboard() {
 
 	const buildParams = useCallback(
 		(next: FormState): ExperimentConfigParams => ({
+			// Traffic Level や閾値などフォームに無い条件は Replay 元の値を保つ。
+			// これが無いとリセット時に条件が変わり、同じ Run を再実行できなくなる
+			...replay?.params,
 			seed: next.seed,
 			population: next.population,
 			days: next.days,
@@ -102,12 +136,13 @@ export function SimulationDashboard() {
 			intervention: next.intervention === 'none' ? null : next.intervention,
 			aiDecisionEnabled: next.aiDecisionEnabled,
 		}),
-		[],
+		[replay],
 	);
 
+	// Replay で開かれた場合は保存された条件で初期化する
 	useEffect(() => {
-		initialize(buildParams(DEFAULT_FORM));
-	}, [initialize, buildParams]);
+		initialize(replay === undefined ? buildParams(DEFAULT_FORM) : replay.params);
+	}, [initialize, buildParams, replay]);
 
 	const state = stateRef.current;
 	const thresholds = state?.config.sleepStateThresholds ?? null;
@@ -191,6 +226,20 @@ export function SimulationDashboard() {
 				<span className="font-mono text-sm tabular-nums text-muted-foreground">
 					{view?.clockLabel ?? '-'}
 				</span>
+				{replay === undefined ? null : (
+					<span className="rounded bg-muted px-2 py-0.5 text-xs text-foreground">
+						Replay: {replay.label}
+					</span>
+				)}
+				<Link href="/experiments" className="text-xs text-muted-foreground underline">
+					Experiment Dashboard
+				</Link>
+				<Link href="/critical-point" className="text-xs text-muted-foreground underline">
+					Critical Point Explorer
+				</Link>
+				<Link href="/super-spreader" className="text-xs text-muted-foreground underline">
+					Super-spreader Explorer
+				</Link>
 				<div className="ml-auto flex items-center gap-2">
 					{isRunning ? (
 						<Button size="sm" variant="secondary" onClick={pause}>

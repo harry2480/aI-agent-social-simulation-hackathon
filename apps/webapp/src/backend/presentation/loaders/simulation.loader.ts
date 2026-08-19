@@ -9,6 +9,7 @@ import {
 	agentDecisionRepository,
 	agentRepository,
 	eventRepository,
+	isDatabaseConfigured,
 	metricsRepository,
 	simulationRunRepository,
 } from '../composition/simulation.composition';
@@ -23,10 +24,27 @@ export interface RunDetail {
 }
 
 export async function loadRecentRuns(limit = 20): Promise<StoredRun[]> {
+	if (!isDatabaseConfigured()) {
+		return [];
+	}
 	return simulationRunRepository.findRecent(limit);
 }
 
+/**
+ * Replay 用に Run のメタ情報だけを読む。
+ * 再実行に必要なのは Config スナップショットだけなので、Agent / Event までは読まない。
+ */
+export async function loadRunForReplay(runId: string): Promise<StoredRun | null> {
+	if (!isDatabaseConfigured()) {
+		return null;
+	}
+	return simulationRunRepository.findById(runId);
+}
+
 export async function loadRunDetail(runId: string): Promise<RunDetail | null> {
+	if (!isDatabaseConfigured()) {
+		return null;
+	}
 	const run = await simulationRunRepository.findById(runId);
 	if (run === null) {
 		return null;

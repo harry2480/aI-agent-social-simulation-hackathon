@@ -191,6 +191,67 @@ describe('SimulationEngine', () => {
 		});
 	});
 
+	describe('Logistics 連鎖', () => {
+		/** 遅配が起きる規模。Delivery Worker が数人しかいない小規模では連鎖が観測できない */
+		const logisticsConfig = {
+			population: 150,
+			days: 4,
+			initialSleepDeprivedRate: 0.3,
+			shockTarget: 'driver' as const,
+			trafficLevel: 1.5,
+		};
+
+		it('遅れた配送は Store Worker の業務遅延として伝播する', async () => {
+			const { state } = await run(logisticsConfig);
+
+			const deliveryDelays = state.events.filter((event) => event.type === 'delivery_delay');
+			const storeDelays = state.events.filter((event) => event.type === 'store_delay');
+
+			expect(deliveryDelays.length).toBeGreaterThan(0);
+			expect(storeDelays.length).toBeGreaterThan(0);
+			// Store の遅延は必ず遅配を原因に持つ（時間的に近いだけの Event を原因にしない）
+			const deliveryIds = new Set(deliveryDelays.map((event) => event.id));
+			expect(
+				storeDelays.every((event) => event.causedByEventIds.some((id) => deliveryIds.has(id))),
+			).toBe(true);
+		});
+
+		it('遅配は Store Worker 本人ではなく配送側を Actor として記録する', async () => {
+			const { state } = await run(logisticsConfig);
+
+			const deliveryDelays = state.events.filter((event) => event.type === 'delivery_delay');
+			for (const event of deliveryDelays) {
+				const actor = event.actorId === undefined ? undefined : state.agents.get(event.actorId);
+				expect(actor?.role).toBe('delivery_worker');
+				expect(event.targetIds.length).toBe(1);
+			}
+		});
+
+		it('Store Worker の遅延は配送先の店舗で働く Agent にだけ及ぶ', async () => {
+			const { state } = await run(logisticsConfig);
+
+			const storeDelays = state.events.filter((event) => event.type === 'store_delay');
+			for (const event of storeDelays) {
+				const actor = event.actorId === undefined ? undefined : state.agents.get(event.actorId);
+				expect(actor?.role).toBe('store_worker');
+			}
+		});
+
+		it('店舗遅延は Store Worker への Sleep Transmission として記録される', async () => {
+			const withLogistics = await run(logisticsConfig);
+			const storeDelays = withLogistics.state.events.filter(
+				(event) => event.type === 'store_delay',
+			);
+
+			// 店舗遅延を経由した睡眠機会損失が Transmission として記録されていること
+			const storeDelayActorIds = new Set(storeDelays.map((event) => event.actorId));
+			const transmissionsToStoreWorkers = withLogistics.state.transmissions.filter((transmission) =>
+				storeDelayActorIds.has(transmission.toAgentId),
+			);
+			expect(transmissionsToStoreWorkers.length).toBeGreaterThan(0);
+		});
+	});
+
 	describe('Intervention', () => {
 		it('Remote Work は通勤遅延を減らす', async () => {
 			const none = await run({ population: 300, days: 7 });

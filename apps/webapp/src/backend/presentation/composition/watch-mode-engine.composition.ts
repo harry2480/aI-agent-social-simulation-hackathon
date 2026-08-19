@@ -45,7 +45,12 @@ export type { Agent } from '../../domain/models/agent.model';
 export type { City, Facility, District, Road } from '../../domain/models/city.model';
 export type { MetricsSnapshot, RunSummary } from '../../domain/models/metrics.model';
 export type { SleepStateName } from '../../domain/models/sleep-state.model';
-export type { EventType, SimulationEvent } from '../../domain/models/simulation-event.model';
+export type {
+	EventOrigin,
+	EventType,
+	SimulationEvent,
+} from '../../domain/models/simulation-event.model';
+export { originOfEventType } from '../../domain/models/simulation-event.model';
 export type {
 	SimulationState,
 	SleepTransmission,

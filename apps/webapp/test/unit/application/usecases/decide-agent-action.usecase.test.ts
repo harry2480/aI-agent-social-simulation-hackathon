@@ -127,4 +127,31 @@ describe('decisionContextKey', () => {
 		});
 		expect(a).toBe(b);
 	});
+
+	it('deadlinePressure の高低はビンが分かれる', () => {
+		// 0〜1 の値を分単位と同じ幅で丸めると全て同一ビンへ潰れ、Cache が状況を区別できなくなる
+		const a = decisionContextKey({ ...context, situation: { deadlinePressure: 0.2 } });
+		const b = decisionContextKey({ ...context, situation: { deadlinePressure: 0.9 } });
+		expect(a).not.toBe(b);
+	});
+
+	it('deadlinePressure が同じビンなら同一キーになる', () => {
+		const a = decisionContextKey({ ...context, situation: { deadlinePressure: 0.81 } });
+		const b = decisionContextKey({ ...context, situation: { deadlinePressure: 0.89 } });
+		expect(a).toBe(b);
+	});
+
+	it('遅延分数は 10 分単位でビニングされる', () => {
+		const a = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 21 } });
+		const b = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 29 } });
+		const c = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 31 } });
+		expect(a).toBe(b);
+		expect(a).not.toBe(c);
+	});
+
+	it('actions が違えばキーも変わる', () => {
+		const a = decisionContextKey(context);
+		const b = decisionContextKey({ ...context, actions: ['go_home', 'overtime'] });
+		expect(a).not.toBe(b);
+	});
 });

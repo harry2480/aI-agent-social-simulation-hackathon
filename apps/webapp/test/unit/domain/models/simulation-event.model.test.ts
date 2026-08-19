@@ -1,4 +1,8 @@
-import { MAX_EVENT_DEPTH, SimulationEvent } from '@/backend/domain/models/simulation-event.model';
+import {
+	MAX_EVENT_DEPTH,
+	SimulationEvent,
+	originOfEventType,
+} from '@/backend/domain/models/simulation-event.model';
 import { describe, expect, it } from 'vitest';
 
 describe('SimulationEvent', () => {
@@ -111,5 +115,24 @@ describe('SimulationEvent.isSignificant', () => {
 		expect(SimulationEvent.create({ id: 'e', tick: 0, type: 'recovery' }).isSignificant).toBe(
 			false,
 		);
+	});
+});
+
+describe('originOfEventType', () => {
+	it('AI が決めるのは行動の選択だけで、事故は確率抽選として扱う', () => {
+		expect(originOfEventType('decision')).toBe('ai_decision');
+		expect(originOfEventType('accident')).toBe('probabilistic');
+		expect(originOfEventType('work_failure')).toBe('probabilistic');
+	});
+
+	it('計算結果として必然的に起きる Event は deterministic', () => {
+		expect(originOfEventType('commute_delay')).toBe('deterministic');
+		expect(originOfEventType('overtime')).toBe('deterministic');
+		expect(originOfEventType('sleep_opportunity_loss')).toBe('deterministic');
+	});
+
+	it('Event 自身も由来を答えられる', () => {
+		const event = SimulationEvent.create({ id: 'e1', tick: 0, type: 'accident' });
+		expect(event.origin).toBe('probabilistic');
 	});
 });

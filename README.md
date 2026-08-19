@@ -90,9 +90,26 @@ pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=shock-comparison 
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=critical-point --seeds=10
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
 pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
+
+# 同一 Seed・同一条件のままモデルだけを変えて比較する（要 OPENROUTER_API_KEY）
+pnpm --filter webapp exec tsx scripts/compare-ai-models.ts --models=<model-id>,<model-id> --seeds=3
 ```
 
 `DATABASE_URL` が未設定の場合は DB へ保存せず、集計結果を標準出力に出します。
+`run-experiment.ts` は Seed ごとの Run も保存します（`--save-runs=false` で無効化）。
+
+### 画面
+
+| URL | 内容 |
+|---|---|
+| `/` | Simulation（Watch Mode）。`/?replay=<runId>` で保存済み Run を同一条件で再実行して観察 |
+| `/experiments` | 実験の条件比較（平均 ± 標準偏差・対照条件との差） |
+| `/experiments/[id]` | 自動分析レポート・KPI 時系列・Run 一覧 |
+| `/critical-point` | 初期睡眠不足率 Sweep の Cascade Probability 曲線と臨界点候補 |
+| `/super-spreader` | Sleep Super-spreader の Stage 2 ランキング |
+
+実験結果を読む画面はスクリプトが保存したデータを表示します。`DATABASE_URL` が未設定の場合は
+エラーにせず、実行方法を案内する空状態を表示します。
 
 ## プロジェクト構成
 

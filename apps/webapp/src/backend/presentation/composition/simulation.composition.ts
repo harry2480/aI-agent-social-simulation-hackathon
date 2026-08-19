@@ -7,8 +7,18 @@ import { PrismaMetricsRepository } from '../../infrastructure/repositories/prism
 import { PrismaSimulationRunRepository } from '../../infrastructure/repositories/prisma-simulation-run.repository';
 import {
 	createDecideAgentActionUseCase,
+	createDecideAgentActionUseCaseForModel,
 	createRuleBasedDecisionGateway,
 } from './decision.composition';
+
+/**
+ * DB が未設定の環境（DATABASE_URL 無しのローカル開発）かどうか。
+ * Prisma は接続時に例外を投げるため、読み取り前にここで判定して画面を 500 にしない。
+ */
+export function isDatabaseConfigured(): boolean {
+	const url = process.env.DATABASE_URL;
+	return url !== undefined && url.length > 0;
+}
 
 export const simulationRunRepository = new PrismaSimulationRunRepository();
 export const experimentRepository = new PrismaExperimentRepository();
@@ -25,6 +35,14 @@ export function createRunSimulationUseCase(): RunSimulationUseCase {
 /** Experiment Mode（Rule-based 固定）の Run 実行 */
 export function createExperimentRunSimulationUseCase(): RunSimulationUseCase {
 	return new RunSimulationUseCase(createRuleBasedDecisionGateway(), simulationRunRepository);
+}
+
+/** AI Model 比較用。モデルごとに Gateway を差し替えて Run を実行する */
+export function createModelComparisonRunSimulationUseCase(model: string): RunSimulationUseCase {
+	return new RunSimulationUseCase(
+		createDecideAgentActionUseCaseForModel(model),
+		simulationRunRepository,
+	);
 }
 
 /**

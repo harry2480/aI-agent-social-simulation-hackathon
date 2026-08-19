@@ -24,6 +24,24 @@ export function createDecideAgentActionUseCase(): DecideAgentActionUseCase {
 	);
 }
 
+/**
+ * モデルを指定して AI Decision の UseCase を組み立てる（AI Model 比較用）。
+ * `OPENROUTER_API_KEY` が無い環境では Rule-based へ縮退するため、比較結果は同一になる。
+ */
+export function createDecideAgentActionUseCaseForModel(model: string): DecideAgentActionUseCase {
+	const apiKey = process.env.OPENROUTER_API_KEY;
+	const primary =
+		apiKey === undefined || apiKey.length === 0
+			? new RuleBasedAiDecisionGateway()
+			: new OpenRouterAiDecisionGateway(apiKey, model);
+
+	return new DecideAgentActionUseCase(
+		primary,
+		new RuleBasedAiDecisionGateway(),
+		new InMemoryDecisionCache(),
+	);
+}
+
 /** Experiment Mode / 再現性検証で使う、AI を呼ばない Gateway */
 export function createRuleBasedDecisionGateway(): AiDecisionGateway {
 	return new RuleBasedAiDecisionGateway();
