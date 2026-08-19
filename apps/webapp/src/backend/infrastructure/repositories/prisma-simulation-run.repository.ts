@@ -212,6 +212,7 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 		intervention: string | null;
 		aiModel: string | null;
 		status: string;
+		configJson: Prisma.JsonValue;
 		summaryJson: Prisma.JsonValue;
 	}): StoredRun {
 		return {
@@ -223,6 +224,7 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 			intervention: record.intervention,
 			aiModel: record.aiModel,
 			status: record.status,
+			config: record.configJson,
 			summary: record.summaryJson === null ? null : (record.summaryJson as unknown as RunSummary),
 		};
 	}

@@ -10,7 +10,10 @@
  *   pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
  *
  * DATABASE_URL が設定されていない場合は保存せず、集計結果を標準出力へ出す。
+ * Run 単位（Agent / Event / Metrics）の保存は Experiment 詳細画面の時系列グラフに必要なため
+ * 既定で行う。集計だけが欲しい場合は --save-runs=false を付ける。
  */
+import type { RunSimulationUseCase } from '../src/backend/application/usecases/run-simulation.usecase';
 import {
 	ExperimentConfig,
 	type ExperimentConfigParams,
@@ -65,7 +68,7 @@ const CONDITIONS: Record<ExperimentKind, Condition[]> = {
 	],
 };
 
-function parseArgs(): { kind: ExperimentKind; seeds: number } {
+function parseArgs(): { kind: ExperimentKind; seeds: number; saveRuns: boolean } {
 	const args = process.argv.slice(2);
 	const get = (name: string): string | undefined =>
 		args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
@@ -74,13 +77,49 @@ function parseArgs(): { kind: ExperimentKind; seeds: number } {
 	if (!(kind in CONDITIONS)) {
 		throw new Error(`unknown kind: ${kind}. use ${Object.keys(CONDITIONS).join(' | ')}`);
 	}
-	return { kind, seeds: Number(get('seeds') ?? 10) };
+	return {
+		kind,
+		seeds: parseSeeds(get('seeds'), 10),
+		saveRuns: get('save-runs') !== 'false',
+	};
 }
 
-async function runOnce(params: ExperimentConfigParams): Promise<RunSummary> {
+/**
+ * Seed 数を読み取る。
+ * 不正値のまま進むと Run が 1 本も回らず、NaN や -Infinity の集計が DB へ保存される。
+ */
+function parseSeeds(raw: string | undefined, fallback: number): number {
+	if (raw === undefined) {
+		return fallback;
+	}
+	const seeds = Number(raw);
+	if (!Number.isInteger(seeds) || seeds < 1) {
+		throw new Error('--seeds には 1 以上の整数を指定してください');
+	}
+	return seeds;
+}
+
+/**
+ * Run を 1 本実行する。
+ * runner が渡された場合は Run 単位の詳細（Agent / Event / Causal Edge / Metrics）も保存する。
+ */
+async function runOnce(
+	params: ExperimentConfigParams,
+	runner: RunSimulationUseCase | null,
+	experimentId: string | null,
+): Promise<RunSummary> {
 	const configResult = ExperimentConfig.create(params);
 	if (!configResult.success) {
 		throw new Error(`invalid experiment config: ${configResult.error}`);
+	}
+
+	if (runner !== null) {
+		const result = await runner.execute({
+			config: configResult.value,
+			experimentId,
+			persist: true,
+		});
+		return result.summary;
 	}
 
 	// Experiment Mode は Rule-based 固定。AI の非決定性を排除し、大量実行のコストを抑える
@@ -97,10 +136,15 @@ function standardDeviation(values: number[]): number {
 	return Math.sqrt(variance);
 }
 
-async function aggregate(condition: Condition, seeds: number): Promise<Aggregate> {
+async function aggregate(
+	condition: Condition,
+	seeds: number,
+	runner: RunSimulationUseCase | null,
+	experimentId: string | null,
+): Promise<Aggregate> {
 	const summaries: RunSummary[] = [];
 	for (let seed = 1; seed <= seeds; seed++) {
-		summaries.push(await runOnce({ ...BASE, ...condition.overrides, seed }));
+		summaries.push(await runOnce({ ...BASE, ...condition.overrides, seed }, runner, experimentId));
 	}
 
 	const reaches = summaries.map((summary) => summary.cascadeReach);
@@ -119,14 +163,37 @@ async function aggregate(condition: Condition, seeds: number): Promise<Aggregate
 }
 
 async function main(): Promise<void> {
-	const { kind, seeds } = parseArgs();
+	const { kind, seeds, saveRuns } = parseArgs();
 	const conditions = CONDITIONS[kind];
 	console.log(`[experiment] kind=${kind} seeds=${seeds} conditions=${conditions.length}`);
+
+	const persists = process.env.DATABASE_URL !== undefined;
+	if (!persists) {
+		console.log('[experiment] DATABASE_URL 未設定のため保存をスキップします');
+	}
+
+	// 保存は infrastructure を直接使わず composition 経由で解決する。
+	// DATABASE_URL が無い環境では Prisma を読み込まないよう、import 自体を遅延させる
+	const composition = persists
+		? await import('../src/backend/presentation/composition/simulation.composition')
+		: null;
+
+	// Run を experimentId へ紐付けるため、実験レコードは実行前に作る
+	const experimentId =
+		composition === null
+			? null
+			: await composition.experimentRepository.create({
+					name: `${kind} (${seeds} seeds)`,
+					kind,
+					config: { base: BASE, seeds, conditions: conditions.map((c) => c.label) },
+				});
+	const runner =
+		composition === null || !saveRuns ? null : composition.createExperimentRunSimulationUseCase();
 
 	const results: Aggregate[] = [];
 	for (const condition of conditions) {
 		const startedAt = Date.now();
-		const result = await aggregate(condition, seeds);
+		const result = await aggregate(condition, seeds, runner, experimentId);
 		results.push(result);
 		console.log(
 			`  ${result.label.padEnd(20)} reach=${result.averageReach.toFixed(1)} ` +
@@ -136,25 +203,17 @@ async function main(): Promise<void> {
 		);
 	}
 
-	if (process.env.DATABASE_URL === undefined) {
-		console.log('[experiment] DATABASE_URL 未設定のため保存をスキップしました');
+	if (composition === null || experimentId === null) {
 		return;
 	}
 
-	// 保存は infrastructure を直接使わず composition 経由で解決する
-	const { experimentRepository } = await import(
-		'../src/backend/presentation/composition/simulation.composition'
-	);
-	const experimentId = await experimentRepository.create({
-		name: `${kind} (${seeds} seeds)`,
-		kind,
-		config: { base: BASE, seeds, conditions: conditions.map((c) => c.label) },
-	});
-	await experimentRepository.saveResults(
+	await composition.experimentRepository.saveResults(
 		experimentId,
 		results.map((result) => ({ ...result, aggregate: result })),
 	);
-	console.log(`[experiment] saved: experimentId=${experimentId}`);
+	console.log(
+		`[experiment] saved: experimentId=${experimentId} runs=${saveRuns ? conditions.length * seeds : 0}`,
+	);
 }
 
 main().catch((error: unknown) => {

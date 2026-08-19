@@ -13,7 +13,9 @@ import type {
 	CausalGraphNode,
 	CausalSubgraph,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
+import { EventOriginLegend } from '@/frontend/components/event-origin/event-origin-legend';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
+import { eventTypePresentation } from '@/frontend/lib/event-origin-presentation';
 import { formatEventLabel } from '@/frontend/lib/format';
 import { useMemo } from 'react';
 
@@ -28,6 +30,7 @@ const COLUMN_WIDTH = 220;
 const ROW_HEIGHT = 78;
 
 function nodeLabel(node: CausalGraphNode): string {
+	const origin = eventTypePresentation(node.type);
 	const day = Math.floor(node.tick / 96) + 1;
 	const hour = String(Math.floor((node.tick % 96) / 4)).padStart(2, '0');
 	const minute = String((node.tick % 4) * 15).padStart(2, '0');
@@ -37,7 +40,8 @@ function nodeLabel(node: CausalGraphNode): string {
 			: node.delayMinutes !== undefined
 				? ` +${node.delayMinutes}min`
 				: '';
-	return `${formatEventLabel(node.type)}\nD${day} ${hour}:${minute}${impact}\n${node.actorId ?? '-'}`;
+	// AI 判断ノードと確率イベントノードを取り違えると因果の読み方を誤るため、由来を先頭に出す
+	return `${origin.marker} ${formatEventLabel(node.type)}\nD${day} ${hour}:${minute}${impact}\n${node.actorId ?? '-'}`;
 }
 
 /**
@@ -74,6 +78,8 @@ export function CausalGraph({ subgraph, selectedEventId, onSelectEvent }: Causal
 						: isSelected
 							? 'var(--color-foreground)'
 							: 'var(--color-border)',
+					// 由来ごとに枠線の種類を変える。色だけに頼らない（docs/スタイルガイド.md）
+					borderStyle: eventTypePresentation(node.type).graphBorderStyle,
 					background: 'var(--color-card)',
 					color: 'var(--color-foreground)',
 				},
@@ -97,10 +103,11 @@ export function CausalGraph({ subgraph, selectedEventId, onSelectEvent }: Causal
 	return (
 		<Card className="flex min-h-0 flex-col">
 			<CardHeader className="pb-2">
-				<CardTitle className="text-sm">
-					Causal Graph
+				<CardTitle className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+					<span>Causal Graph</span>
+					<EventOriginLegend />
 					{subgraph?.truncated === true ? (
-						<span className="ml-2 text-xs font-normal text-muted-foreground">
+						<span className="text-xs font-normal text-muted-foreground">
 							（ノード数上限のため一部のみ表示）
 						</span>
 					) : null}

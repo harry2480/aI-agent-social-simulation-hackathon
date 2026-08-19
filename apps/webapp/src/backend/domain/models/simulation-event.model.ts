@@ -49,6 +49,29 @@ export function networkOfEventType(type: EventType): NetworkName | undefined {
 	return NETWORK_BY_EVENT_TYPE[type];
 }
 
+/**
+ * その Event が何によって決まったか（要件定義 19 章）。
+ *
+ * - ai_decision: AI が選んだ行動そのもの
+ * - probabilistic: Simulation Engine の確率抽選で発生した出来事
+ * - deterministic: 遅延時間や睡眠時間の計算結果として必然的に発生した出来事
+ *
+ * AI は「事故を起こすか」ではなく「事故リスクのある行動を取るか」を決める。
+ * UI 側でこの区別を示さないと、事故を AI が起こしたものと誤読される。
+ */
+export type EventOrigin = 'ai_decision' | 'probabilistic' | 'deterministic';
+
+const ORIGIN_BY_EVENT_TYPE: Partial<Record<EventType, EventOrigin>> = {
+	decision: 'ai_decision',
+	// 抽選を経て発生するのはこの 2 種のみ。traffic_jam は事故発生後に必ず起きる
+	accident: 'probabilistic',
+	work_failure: 'probabilistic',
+};
+
+export function originOfEventType(type: EventType): EventOrigin {
+	return ORIGIN_BY_EVENT_TYPE[type] ?? 'deterministic';
+}
+
 export interface EventImpact {
 	delayMinutes?: number;
 	sleepLossMinutes?: number;
@@ -72,6 +95,8 @@ const SIGNIFICANT_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
 	'work_failure',
 	'work_delay',
 	'overtime',
+	'delivery_delay',
+	'store_delay',
 	'household_delay',
 	'sleep_opportunity_loss',
 	'sleep_loss',
@@ -150,5 +175,10 @@ export class SimulationEvent {
 
 	get isSignificant(): boolean {
 		return SIGNIFICANT_EVENT_TYPES.has(this.type);
+	}
+
+	/** この Event が AI 判断・確率抽選・決定論的計算のどれで決まったか */
+	get origin(): EventOrigin {
+		return originOfEventType(this.type);
 	}
 }

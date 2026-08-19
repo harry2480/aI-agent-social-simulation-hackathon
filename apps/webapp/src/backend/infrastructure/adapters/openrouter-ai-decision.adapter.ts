@@ -45,6 +45,9 @@ export class OpenRouterAiDecisionGateway implements AiDecisionGateway {
 			name: 'openrouter',
 			baseURL: 'https://openrouter.ai/api/v1',
 			apiKey,
+			// これを立てないと AI SDK が JSON Schema を落とし、response_format は json_object のみになる。
+			// その場合 action の enum 制約が API へ伝わらず、Structured Output の要件を満たせない
+			supportsStructuredOutputs: true,
 		});
 	}
 
@@ -63,7 +66,13 @@ export class OpenRouterAiDecisionGateway implements AiDecisionGateway {
 			model: this.provider(this.model),
 			system: SYSTEM_PROMPT,
 			schema,
-			prompt: JSON.stringify({ agent: context.agent, situation: context.situation }),
+			// actions を prompt にも載せる。Structured Output に未対応なモデルへ切り替えた際も
+			// 選択肢が伝わるようにするため（スキーマだけに頼らない）
+			prompt: JSON.stringify({
+				agent: context.agent,
+				situation: context.situation,
+				actions,
+			}),
 			abortSignal: AbortSignal.timeout(this.timeoutMs),
 		});
 

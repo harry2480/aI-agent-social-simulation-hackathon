@@ -76,6 +76,8 @@ export interface StoredRun {
 	intervention: string | null;
 	aiModel: string | null;
 	status: string;
+	/** Run 実行時の ExperimentConfig スナップショット。条件の違いを画面で示すために使う */
+	config: unknown;
 	summary: RunSummary | null;
 }
 

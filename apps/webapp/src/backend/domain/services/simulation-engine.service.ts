@@ -51,10 +51,31 @@ interface AgentRuntime {
 	delayCauseEventIds: string[];
 	overtimeTicks: number;
 	lateMinutes: number;
+	/** Delivery Worker の配送先 Store。固定割り当てにして Run の再現性を保つ */
+	deliveryStoreId: string | undefined;
+	/** その日の配送を済ませたか。1 日 1 回だけ配送する */
+	deliveryDone: boolean;
 }
 
 /** 事故が道路へ与える混雑（分） */
 const ACCIDENT_CONGESTION_MINUTES = 25;
+/**
+ * 出勤から配送到着までの Tick。
+ * Delivery Worker は 8:00 始業、Store は 10:00 開店のため、開店後の品出し時間帯（11:00）に着く。
+ * 開店前に着くと Store Worker がまだ出勤しておらず、遅配が店舗業務へ波及しない。
+ */
+const DELIVERY_TICKS_AFTER_WORK_START = 12;
+/**
+ * Store の業務が押し始める配送遅延（分）。
+ * これ未満の遅れは店舗側の余裕時間で吸収され、他 Agent へは伝播しない。
+ */
+const DELIVERY_DELAY_THRESHOLD_MINUTES = 15;
+/**
+ * 1 回の配送遅延が Store Worker の終業を押す上限（分）。
+ * 上限が無いと 1 件の遅配で店舗全員が深夜まで残ることになり、実態から離れる。
+ * 上限を掛けるのは店舗へ反映する分だけで、遅配 Event には実際の遅延を記録する。
+ */
+const MAX_STORE_DELAY_MINUTES = 60;
 /** 帰宅後の家事に要する Tick */
 const HOUSEWORK_TICKS = 2;
 /**
@@ -77,6 +98,12 @@ const METRICS_SAMPLING_TICKS = TICKS_PER_HOUR;
  */
 export class SimulationEngine {
 	private readonly runtimes = new Map<string, AgentRuntime>();
+	/**
+	 * Store ごとに、その日すでに店舗業務へ反映した配送遅延（分）。
+	 * 同じ店舗に複数の配送があるため、遅延をそのまま足し込むと 1 日で数時間ずれる。
+	 * 店舗の遅れはその日いちばん遅れた配送で決まるものとして扱う。
+	 */
+	private readonly storeDelayByDay = new Map<string, { day: number; appliedMinutes: number }>();
 
 	constructor(
 		private readonly config: ExperimentConfig,
@@ -364,6 +391,10 @@ export class SimulationEngine {
 			this.rollWorkFailure(state, agent, runtime, tick);
 		}
 
+		if (agent.role === 'delivery_worker') {
+			this.deliverToStore(state, agent, runtime, tick);
+		}
+
 		if (tick < runtime.workEndTick) {
 			return;
 		}
@@ -436,6 +467,101 @@ export class SimulationEngine {
 		);
 		this.fatigueService.applyImpact(manager, 0, 3);
 		managerRuntime.delayCauseEventIds.push(delayEvent.id);
+	}
+
+	/**
+	 * Logistics Hub → Delivery Worker → Store の連鎖（要件定義 5 章）。
+	 *
+	 * 遅れて配送された分だけ Store の開店準備・品出しが後ろへずれ、Store Worker の終業が延びる。
+	 * 運転職の遅延が Transportation Network から Work Network へ渡る経路であり、
+	 * これが無いと Delivery Worker は事故を起こしたときしか他者へ伝播できない。
+	 */
+	private deliverToStore(
+		state: SimulationState,
+		agent: Agent,
+		runtime: AgentRuntime,
+		tick: number,
+	): void {
+		if (runtime.deliveryDone || runtime.deliveryStoreId === undefined) {
+			return;
+		}
+		if (tick < runtime.workStartTick + DELIVERY_TICKS_AFTER_WORK_START) {
+			return;
+		}
+
+		runtime.deliveryDone = true;
+
+		// 出勤の遅れがそのまま配送の遅れになる。定刻どおりなら店舗へ影響しない
+		const deliveryDelayMinutes = runtime.lateMinutes;
+		if (deliveryDelayMinutes < DELIVERY_DELAY_THRESHOLD_MINUTES) {
+			return;
+		}
+
+		const causes = runtime.delayCauseEventIds
+			.map((id) => state.eventById(id))
+			.filter((event): event is SimulationEvent => event !== undefined);
+		const deliveryEvent = state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick,
+				type: 'delivery_delay',
+				actorId: agent.id,
+				targetIds: [runtime.deliveryStoreId],
+				causes,
+				impact: { delayMinutes: deliveryDelayMinutes, stressDelta: 3 },
+			}),
+		);
+		this.fatigueService.applyImpact(agent, 0, 3);
+
+		if (deliveryEvent.isAtMaxDepth) {
+			return;
+		}
+
+		const storeDelayMinutes = Math.min(deliveryDelayMinutes, MAX_STORE_DELAY_MINUTES);
+		const day = Math.floor(tick / TICKS_PER_DAY);
+		const applied = this.storeDelayByDay.get(runtime.deliveryStoreId);
+		const alreadyApplied =
+			applied !== undefined && applied.day === day ? applied.appliedMinutes : 0;
+
+		const additionalMinutes = storeDelayMinutes - alreadyApplied;
+		if (additionalMinutes < DELIVERY_DELAY_THRESHOLD_MINUTES) {
+			return;
+		}
+
+		// 反映しなかった遅延を記録すると、以後の遅配が過大な値との差分で判定され取りこぼす。
+		// 実際に店舗業務へ反映した分だけを残す
+		this.storeDelayByDay.set(runtime.deliveryStoreId, { day, appliedMinutes: storeDelayMinutes });
+
+		const delayTicks = Math.max(1, Math.round(additionalMinutes / MINUTES_PER_TICK));
+		for (const storeWorker of state.orderedAgents()) {
+			if (storeWorker.workplaceId !== runtime.deliveryStoreId) {
+				continue;
+			}
+			const workerRuntime = this.runtimes.get(storeWorker.id);
+			if (workerRuntime === undefined) {
+				continue;
+			}
+			// Tick 内の処理順に依存しないよう phase ではなく勤務時間で判定する。
+			// Delivery Worker が先に処理される Tick では、同じ Tick に到着した Store Worker が
+			// まだ commuting_to_work のままで、遅配の影響を取りこぼす
+			if (tick < workerRuntime.workStartTick || tick >= workerRuntime.workEndTick) {
+				continue;
+			}
+
+			workerRuntime.workEndTick += delayTicks;
+			const storeEvent = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick,
+					type: 'store_delay',
+					actorId: storeWorker.id,
+					causes: [deliveryEvent],
+					impact: { delayMinutes: delayTicks * MINUTES_PER_TICK, stressDelta: 3 },
+				}),
+			);
+			this.fatigueService.applyImpact(storeWorker, 0, 3);
+			workerRuntime.delayCauseEventIds.push(storeEvent.id);
+		}
 	}
 
 	private async handleDrivingDecision(
@@ -963,6 +1089,9 @@ export class SimulationEngine {
 				delayCauseEventIds: [],
 				overtimeTicks: 0,
 				lateMinutes: 0,
+				deliveryStoreId:
+					agent.role === 'delivery_worker' ? this.deliveryStoreFor(state, index) : undefined,
+				deliveryDone: false,
 			});
 
 			// 初日の朝に人為的な睡眠不足が発生しないよう、起床までの睡眠を先行して計上する
@@ -985,6 +1114,16 @@ export class SimulationEngine {
 		runtime.bedTick = runtime.scheduledBedTick;
 		runtime.scheduledHomeArrivalTick = runtime.workEndTick + runtime.commuteTicks;
 		runtime.lateMinutes = 0;
+		runtime.deliveryDone = false;
+	}
+
+	/** 配送先 Store の割り当て。Agent の並び順から決めることで Seed 固定なら毎回同じになる */
+	private deliveryStoreFor(state: SimulationState, index: number): string | undefined {
+		const stores = state.city.facilitiesOfType('store');
+		if (stores.length === 0) {
+			return undefined;
+		}
+		return stores[index % stores.length]?.id;
 	}
 
 	private estimateCommuteTicks(state: SimulationState, agent: Agent): number {

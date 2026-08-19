@@ -127,4 +127,41 @@ describe('decisionContextKey', () => {
 		});
 		expect(a).toBe(b);
 	});
+
+	it('deadlinePressure の高低はビンが分かれる', () => {
+		// 0〜1 の値を分単位と同じ幅で丸めると全て同一ビンへ潰れ、Cache が状況を区別できなくなる
+		const a = decisionContextKey({ ...context, situation: { deadlinePressure: 0.2 } });
+		const b = decisionContextKey({ ...context, situation: { deadlinePressure: 0.9 } });
+		expect(a).not.toBe(b);
+	});
+
+	it('deadlinePressure が同じビンなら同一キーになる', () => {
+		const a = decisionContextKey({ ...context, situation: { deadlinePressure: 0.81 } });
+		const b = decisionContextKey({ ...context, situation: { deadlinePressure: 0.89 } });
+		expect(a).toBe(b);
+	});
+
+	it('遅延分数は 10 分単位でビニングされる', () => {
+		const a = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 21 } });
+		const b = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 29 } });
+		const c = decisionContextKey({ ...context, situation: { deliveryDelayMinutes: 31 } });
+		expect(a).toBe(b);
+		expect(a).not.toBe(c);
+	});
+
+	it('ビン境界の値が 1 つ下のビンへ落ちない', () => {
+		// 0.3 / 0.1 は 2.9999999999999996 になるため、補正しないと 0.2 のビンに入る
+		const boundary = decisionContextKey({ ...context, situation: { deadlinePressure: 0.3 } });
+		const inSameBin = decisionContextKey({ ...context, situation: { deadlinePressure: 0.35 } });
+		const lowerBin = decisionContextKey({ ...context, situation: { deadlinePressure: 0.29 } });
+
+		expect(boundary).toBe(inSameBin);
+		expect(boundary).not.toBe(lowerBin);
+	});
+
+	it('actions が違えばキーも変わる', () => {
+		const a = decisionContextKey(context);
+		const b = decisionContextKey({ ...context, actions: ['go_home', 'overtime'] });
+		expect(a).not.toBe(b);
+	});
 });

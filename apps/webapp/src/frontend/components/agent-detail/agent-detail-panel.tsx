@@ -6,6 +6,7 @@ import type {
 	SleepStateName,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
+import { eventOriginPresentation } from '@/frontend/lib/event-origin-presentation';
 import { formatNumber, formatRoleLabel } from '@/frontend/lib/format';
 import { sleepStatePresentation } from '@/frontend/lib/sleep-state-presentation';
 
@@ -30,6 +31,7 @@ export function AgentDetailPanel({ agent, sleepState, state }: AgentDetailPanelP
 	}
 
 	const presentation = sleepStatePresentation(sleepState);
+	const aiOrigin = eventOriginPresentation('ai_decision');
 	const parentTransmissions =
 		state?.transmissions.filter((transmission) => transmission.toAgentId === agent.id) ?? [];
 	const childTransmissions =
@@ -72,7 +74,10 @@ export function AgentDetailPanel({ agent, sleepState, state }: AgentDetailPanelP
 				</dl>
 
 				<div>
-					<p className="text-muted-foreground">Last AI Decision</p>
+					<p className="text-muted-foreground">
+						<span className={aiOrigin.textClass}>{aiOrigin.marker}</span> Last AI Decision
+						<span className="ml-1">（{aiOrigin.description}。事故の発生自体は確率抽選）</span>
+					</p>
 					{agent.lastDecision === undefined ? (
 						<p className="text-foreground">-</p>
 					) : (
