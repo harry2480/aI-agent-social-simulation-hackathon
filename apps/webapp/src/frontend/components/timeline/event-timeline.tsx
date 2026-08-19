@@ -53,12 +53,10 @@ export function EventTimeline({ events, onSelectEvent }: EventTimelineProps) {
 										<span className="font-mono tabular-nums text-muted-foreground">
 											{formatTick(event.tick)}
 										</span>{' '}
-										<span
-											aria-label={origin.description}
-											className={origin.textClass}
-											title={origin.description}
-										>
-											{origin.marker}
+										<span className={origin.textClass} title={origin.description}>
+											{/* 記号だけでは読み上げられないため、由来をテキストでも出す */}
+											<span aria-hidden>{origin.marker}</span>
+											<span className="sr-only">{origin.label}: </span>
 										</span>{' '}
 										<span className="font-medium text-foreground">
 											{formatEventLabel(event.type)}

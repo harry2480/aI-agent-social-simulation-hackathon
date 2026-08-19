@@ -35,6 +35,23 @@ describe('parseReplayParams', () => {
 		expect(parseReplayParams('broken')).toBeNull();
 	});
 
+	it('保存時の AI Model を条件として復元する', () => {
+		const params = parseReplayParams({
+			seed: 1,
+			population: 50,
+			days: 2,
+			aiModel: 'qwen/qwen-2.5-72b-instruct',
+		});
+
+		expect(params?.aiModel).toBe('qwen/qwen-2.5-72b-instruct');
+	});
+
+	it('AI Model が文字列でなければ未指定にする', () => {
+		const params = parseReplayParams({ seed: 1, population: 50, days: 2, aiModel: 42 });
+
+		expect(params?.aiModel).toBeUndefined();
+	});
+
 	it('未知の Shock Target / Intervention は既定値へ落とす', () => {
 		const params = parseReplayParams({
 			seed: 1,

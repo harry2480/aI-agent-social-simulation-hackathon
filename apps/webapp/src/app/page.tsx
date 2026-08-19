@@ -1,3 +1,4 @@
+import { resolveAiModelName } from '@/backend/presentation/composition/decision.composition';
 import { loadRunForReplay } from '@/backend/presentation/loaders/simulation.loader';
 import {
 	type ReplaySource,
@@ -32,5 +33,12 @@ async function buildReplaySource(runId: string): Promise<ReplaySource | undefine
 	if (params === null) {
 		return undefined;
 	}
-	return { runId: run.id, label: replayLabel(params), params };
+	return {
+		runId: run.id,
+		label: replayLabel(params),
+		params,
+		savedAiModel: run.aiModel ?? params.aiModel ?? null,
+		// AI Model はクライアントに選ばせず、サーバーの設定に従う（コストとキー保護のため）
+		currentAiModel: resolveAiModelName(),
+	};
 }

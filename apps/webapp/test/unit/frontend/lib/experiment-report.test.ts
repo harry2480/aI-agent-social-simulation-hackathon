@@ -111,6 +111,19 @@ describe('buildExperimentReport', () => {
 		expect(report.findings.some((line) => line.includes('残業 15.0 時間'))).toBe(true);
 	});
 
+	it('summary が無い Run は副作用の集計から除く', () => {
+		const config = { shockTarget: 'driver', initialSleepDeprivedRate: 0.1 };
+		const incomplete: StoredRun = { ...run(config, 4, 10), summary: null };
+		const report = buildExperimentReport({
+			results: [aggregate('driver-shock')],
+			runs: [incomplete, run(config, 6, 20)],
+		});
+
+		// 完了した Run だけを見るので、平均は 6 件・20 時間になる
+		expect(report.findings.some((line) => line.includes('事故 6.0 件'))).toBe(true);
+		expect(report.findings.some((line) => line.includes('残業 20.0 時間'))).toBe(true);
+	});
+
 	it('Run が無ければ副作用を比較できないと明示する', () => {
 		const report = buildExperimentReport({ results: [aggregate('baseline')], runs: [] });
 

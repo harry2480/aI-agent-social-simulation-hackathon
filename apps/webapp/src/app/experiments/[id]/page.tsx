@@ -57,6 +57,8 @@ export default async function ExperimentDetailPage({
 				</CardContent>
 			</Card>
 
+			<ExperimentReportCard results={detail.experiment.results} runs={detail.runs} />
+
 			<Card>
 				<CardHeader className="pb-2">
 					<CardTitle className="text-sm">

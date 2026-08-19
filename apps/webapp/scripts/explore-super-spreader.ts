@@ -122,7 +122,7 @@ async function main(): Promise<void> {
 	// ランキング 1 行を 1 結果として保存する。順位は配列の並びで保持される
 	await experimentRepository.saveResults(
 		experimentId,
-		result.stage2.map((score) => ({
+		result.stage2.map((score, index) => ({
 			label: score.agentId,
 			runCount: score.runCount,
 			cascadeProbability: score.cascadeProbability,
@@ -132,8 +132,9 @@ async function main(): Promise<void> {
 			averageReach: score.attributableReach,
 			totalSleepLossMinutes: score.totalSleepLossMinutes,
 			standardDeviation: 0,
-			// 画面が必要とする Role / Cascade Depth / Cross-network Spread はここへ入れる
-			aggregate: score,
+			// 画面が必要とする Role / Cascade Depth / Cross-network Spread はここへ入れる。
+			// 結果行の取得順は保証されないため、順位も一緒に持たせる
+			aggregate: { ...score, rank: index + 1 },
 		})),
 	);
 	console.log(`\n[super-spreader] saved: experimentId=${experimentId}`);

@@ -522,15 +522,15 @@ export class SimulationEngine {
 		const applied = this.storeDelayByDay.get(runtime.deliveryStoreId);
 		const alreadyApplied =
 			applied !== undefined && applied.day === day ? applied.appliedMinutes : 0;
-		this.storeDelayByDay.set(runtime.deliveryStoreId, {
-			day,
-			appliedMinutes: Math.max(alreadyApplied, storeDelayMinutes),
-		});
 
 		const additionalMinutes = storeDelayMinutes - alreadyApplied;
 		if (additionalMinutes < DELIVERY_DELAY_THRESHOLD_MINUTES) {
 			return;
 		}
+
+		// 反映しなかった遅延を記録すると、以後の遅配が過大な値との差分で判定され取りこぼす。
+		// 実際に店舗業務へ反映した分だけを残す
+		this.storeDelayByDay.set(runtime.deliveryStoreId, { day, appliedMinutes: storeDelayMinutes });
 
 		const delayTicks = Math.max(1, Math.round(additionalMinutes / MINUTES_PER_TICK));
 		for (const storeWorker of state.orderedAgents()) {

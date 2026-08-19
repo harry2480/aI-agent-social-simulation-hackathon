@@ -18,6 +18,7 @@ export interface SuperSpreaderRankingRow {
 }
 
 interface RankingFields {
+	rank?: unknown;
 	role?: unknown;
 	transmissionCount?: unknown;
 	cascadeDepth?: unknown;
@@ -34,18 +35,21 @@ function numberOr(value: unknown, fallback: number): number {
  *
  * Role / Cascade Depth / Cross-network Spread は集計の共通項目に収まらないため
  * `aggregate` へ入れてある。読み取れない場合も画面を落とさず既定値で表示する。
+ *
+ * 順位は保存された rank を使う。結果行の取得順は保証されないため、
+ * 配列の並びに頼ると読み込みのたびに順位が入れ替わりうる。
  */
 export function toSuperSpreaderRanking(
 	results: readonly ExperimentAggregate[],
 ): SuperSpreaderRankingRow[] {
-	return results.map((result, index) => {
+	const rows = results.map((result, index) => {
 		const extra: RankingFields =
 			typeof result.aggregate === 'object' && result.aggregate !== null
 				? (result.aggregate as RankingFields)
 				: {};
 
 		return {
-			rank: index + 1,
+			rank: numberOr(extra.rank, index + 1),
 			agentId: result.label,
 			role: typeof extra.role === 'string' ? extra.role : '-',
 			runCount: result.runCount,
@@ -61,4 +65,6 @@ export function toSuperSpreaderRanking(
 				: [],
 		};
 	});
+
+	return rows.sort((a, b) => a.rank - b.rank);
 }

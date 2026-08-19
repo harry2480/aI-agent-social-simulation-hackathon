@@ -70,6 +70,10 @@ describe('findCriticalPointRange', () => {
 		expect(findCriticalPointRange(series)).toEqual({ lowerRate: null, upperRate: 0.01 });
 	});
 
+	it('Sweep 結果が空なら臨界点は示さない', () => {
+		expect(findCriticalPointRange([])).toBeNull();
+	});
+
 	it('どこも 50% に届かなければ臨界点は示さない', () => {
 		const series = toCriticalPointSeries([
 			aggregate('initial-rate-1%', 0.1),

@@ -237,6 +237,22 @@ describe('SimulationEngine', () => {
 			}
 		});
 
+		it('同じ店舗の同日の遅配は、いちばん遅れた配送の分だけ反映する', async () => {
+			const { state } = await run(logisticsConfig);
+
+			const storeDelays = state.events.filter((event) => event.type === 'store_delay');
+			const byStoreAndDay = new Map<string, number>();
+			for (const event of storeDelays) {
+				const key = `${event.actorId}:${Math.floor(event.tick / 96)}`;
+				byStoreAndDay.set(key, (byStoreAndDay.get(key) ?? 0) + (event.impact.delayMinutes ?? 0));
+			}
+
+			// 1 日に複数の遅配が届いても、累積は 1 回あたりの上限（60 分）を超えない
+			for (const total of byStoreAndDay.values()) {
+				expect(total).toBeLessThanOrEqual(60);
+			}
+		});
+
 		it('店舗遅延は Store Worker への Sleep Transmission として記録される', async () => {
 			const withLogistics = await run(logisticsConfig);
 			const storeDelays = withLogistics.state.events.filter(

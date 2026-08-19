@@ -149,6 +149,16 @@ describe('decisionContextKey', () => {
 		expect(a).not.toBe(c);
 	});
 
+	it('ビン境界の値が 1 つ下のビンへ落ちない', () => {
+		// 0.3 / 0.1 は 2.9999999999999996 になるため、補正しないと 0.2 のビンに入る
+		const boundary = decisionContextKey({ ...context, situation: { deadlinePressure: 0.3 } });
+		const inSameBin = decisionContextKey({ ...context, situation: { deadlinePressure: 0.35 } });
+		const lowerBin = decisionContextKey({ ...context, situation: { deadlinePressure: 0.29 } });
+
+		expect(boundary).toBe(inSameBin);
+		expect(boundary).not.toBe(lowerBin);
+	});
+
 	it('actions が違えばキーも変わる', () => {
 		const a = decisionContextKey(context);
 		const b = decisionContextKey({ ...context, actions: ['go_home', 'overtime'] });

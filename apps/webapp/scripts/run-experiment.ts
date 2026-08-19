@@ -79,9 +79,24 @@ function parseArgs(): { kind: ExperimentKind; seeds: number; saveRuns: boolean }
 	}
 	return {
 		kind,
-		seeds: Number(get('seeds') ?? 10),
+		seeds: parseSeeds(get('seeds'), 10),
 		saveRuns: get('save-runs') !== 'false',
 	};
+}
+
+/**
+ * Seed 数を読み取る。
+ * 不正値のまま進むと Run が 1 本も回らず、NaN や -Infinity の集計が DB へ保存される。
+ */
+function parseSeeds(raw: string | undefined, fallback: number): number {
+	if (raw === undefined) {
+		return fallback;
+	}
+	const seeds = Number(raw);
+	if (!Number.isInteger(seeds) || seeds < 1) {
+		throw new Error('--seeds には 1 以上の整数を指定してください');
+	}
+	return seeds;
 }
 
 /**

@@ -20,6 +20,7 @@ interface StoredConfigFields {
 	initialSleepDebtHours?: unknown;
 	shockTarget?: unknown;
 	trafficLevel?: unknown;
+	aiModel?: unknown;
 	intervention?: unknown;
 	aiDecisionEnabled?: unknown;
 }
@@ -59,6 +60,8 @@ export function parseReplayParams(config: unknown): ExperimentConfigParams | nul
 		initialSleepDebtHours: finiteNumber(fields.initialSleepDebtHours) ?? undefined,
 		shockTarget: shockTarget ?? 'none',
 		trafficLevel: finiteNumber(fields.trafficLevel) ?? undefined,
+		// 実行に使うモデルはサーバーの環境変数が決めるが、保存時のモデルは条件として残す
+		aiModel: typeof fields.aiModel === 'string' ? fields.aiModel : undefined,
 		intervention: intervention ?? null,
 		aiDecisionEnabled: fields.aiDecisionEnabled === true,
 	};

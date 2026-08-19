@@ -45,6 +45,17 @@ export function CriticalPointView({ experiment, databaseConfigured }: CriticalPo
 	}
 
 	const samples = toCriticalPointSeries(experiment.results);
+	if (samples.length === 0) {
+		// 初期率を読み取れる条件が無い実験。「50% に達していない」とは意味が違う
+		return (
+			<Card>
+				<CardContent className="p-6 text-sm text-muted-foreground">
+					この実験には初期睡眠不足率の Sweep 結果が含まれていません。
+				</CardContent>
+			</Card>
+		);
+	}
+
 	const range = findCriticalPointRange(samples);
 
 	return (

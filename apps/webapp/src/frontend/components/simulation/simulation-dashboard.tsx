@@ -78,6 +78,10 @@ export interface ReplaySource {
 	runId: string;
 	label: string;
 	params: ExperimentConfigParams;
+	/** Run 保存時に使われた AI Model */
+	savedAiModel: string | null;
+	/** いまサーバーが使う AI Model。保存時と違えば AI の判断は同じにならない */
+	currentAiModel: string;
 }
 
 /** 保存された Config をフォームの初期値へ戻す */
@@ -231,6 +235,12 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 						Replay: {replay.label}
 					</span>
 				)}
+				{/* モデルは環境変数で決まるため、保存時と違う場合は AI の判断が再現しないことを示す */}
+				{replay?.savedAiModel != null && replay.savedAiModel !== replay.currentAiModel ? (
+					<span className="rounded bg-warning-bg px-2 py-0.5 text-xs text-warning">
+						AI Model: 保存時 {replay.savedAiModel} / 実行時 {replay.currentAiModel}
+					</span>
+				) : null}
 				<Link href="/experiments" className="text-xs text-muted-foreground underline">
 					Experiment Dashboard
 				</Link>

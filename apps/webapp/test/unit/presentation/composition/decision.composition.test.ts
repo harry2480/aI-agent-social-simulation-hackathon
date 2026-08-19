@@ -2,10 +2,11 @@ import { DEFAULT_AI_MODEL } from '@/backend/infrastructure/adapters/openrouter-a
 import { RULE_BASED_MODEL_NAME } from '@/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
 import {
 	createDecideAgentActionUseCase,
+	createDecideAgentActionUseCaseForModel,
 	createRuleBasedDecisionGateway,
 	resolveAiModelName,
 } from '@/backend/presentation/composition/decision.composition';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const originalApiKey = process.env.OPENROUTER_API_KEY;
 const originalModel = process.env.AI_MODEL;
@@ -22,7 +23,39 @@ function setEnv(name: string, value: string | undefined): void {
 afterEach(() => {
 	setEnv('OPENROUTER_API_KEY', originalApiKey);
 	setEnv('AI_MODEL', originalModel);
+	vi.unstubAllGlobals();
 });
+
+const DRIVER_CONTEXT = {
+	agent: { role: 'driver', fatigue: 90, sleepDebt: 4, responsibility: 0.3, riskTolerance: 0.2 },
+	situation: { deadlinePressure: 0.1 },
+	actions: ['continue_driving', 'rest'],
+};
+
+/** OpenAI 互換のレスポンスを返す Fake。実 API を叩かずに経路だけを検証する */
+function stubOpenRouter(action: string): void {
+	vi.stubGlobal(
+		'fetch',
+		async () =>
+			new Response(
+				JSON.stringify({
+					id: 'chatcmpl-test',
+					object: 'chat.completion',
+					created: 0,
+					model: 'test/model',
+					choices: [
+						{
+							index: 0,
+							message: { role: 'assistant', content: JSON.stringify({ action, reason: 'test' }) },
+							finish_reason: 'stop',
+						},
+					],
+					usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } },
+			),
+	);
+}
 
 describe('resolveAiModelName', () => {
 	it('API キーが無ければ Rule-based を使う', () => {
@@ -78,6 +111,45 @@ describe('createRuleBasedDecisionGateway', () => {
 			situation: { deadlinePressure: 0.9 },
 			actions: ['go_home', 'overtime'],
 		});
+
+		expect(result.model).toBe(RULE_BASED_MODEL_NAME);
+	});
+});
+
+describe('createDecideAgentActionUseCaseForModel', () => {
+	it('API キーがあれば指定モデルで判断する', async () => {
+		setEnv('OPENROUTER_API_KEY', 'key');
+		stubOpenRouter('rest');
+		const useCase = createDecideAgentActionUseCaseForModel('qwen/qwen-2.5-72b-instruct');
+
+		const result = await useCase.decide(DRIVER_CONTEXT);
+
+		expect(result.action).toBe('rest');
+		expect(result.model).toBe('qwen/qwen-2.5-72b-instruct');
+	});
+
+	it('API キーが無ければモデル指定に関係なく Rule-based へ縮退する', async () => {
+		setEnv('OPENROUTER_API_KEY', '');
+		const useCase = createDecideAgentActionUseCaseForModel('qwen/qwen-2.5-72b-instruct');
+
+		const result = await useCase.decide(DRIVER_CONTEXT);
+
+		expect(result.model).toBe(RULE_BASED_MODEL_NAME);
+	});
+
+	it('AI が失敗しても Fallback で判断を返す', async () => {
+		setEnv('OPENROUTER_API_KEY', 'key');
+		vi.stubGlobal(
+			'fetch',
+			async () =>
+				new Response(JSON.stringify({ error: { message: 'invalid api key' } }), {
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				}),
+		);
+		const useCase = createDecideAgentActionUseCaseForModel('google/gemma-3-27b-it');
+
+		const result = await useCase.decide(DRIVER_CONTEXT);
 
 		expect(result.model).toBe(RULE_BASED_MODEL_NAME);
 	});

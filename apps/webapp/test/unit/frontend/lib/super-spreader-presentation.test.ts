@@ -42,6 +42,22 @@ describe('toSuperSpreaderRanking', () => {
 		expect(rows[1].attributableReach).toBe(12);
 	});
 
+	it('保存された順位で並べ替える（結果行の取得順に依存しない）', () => {
+		const rows = toSuperSpreaderRanking([
+			result('agent-9', { role: 'manager', rank: 2 }),
+			result('agent-3', { role: 'driver', rank: 1 }),
+		]);
+
+		expect(rows.map((row) => row.agentId)).toEqual(['agent-3', 'agent-9']);
+		expect(rows.map((row) => row.rank)).toEqual([1, 2]);
+	});
+
+	it('順位が保存されていなければ配列順を順位として使う', () => {
+		const rows = toSuperSpreaderRanking([result('agent-1', {}), result('agent-2', {})]);
+
+		expect(rows.map((row) => row.rank)).toEqual([1, 2]);
+	});
+
 	it('aggregate が壊れていても既定値で表示できる', () => {
 		const rows = toSuperSpreaderRanking([result('agent-1', null), result('agent-2', 'broken')]);
 

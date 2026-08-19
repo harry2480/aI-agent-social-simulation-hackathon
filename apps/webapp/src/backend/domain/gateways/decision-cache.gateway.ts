@@ -10,8 +10,12 @@ export interface DecisionCacheGateway {
 }
 
 function bin(value: number, width: number): number {
-	// 浮動小数の丸め誤差でキーが割れないよう桁を固定する（0.1 幅で 0.7000000000000001 になるため）
-	return Number((Math.floor(value / width) * width).toFixed(4));
+	// 0.3 / 0.1 は 2.9999999999999996 になり、そのまま floor すると 1 つ下のビンへ落ちる。
+	// 商を丸め誤差分だけ持ち上げてから floor し、境界値を本来のビンへ入れる
+	const quotient = value / width;
+	const corrected = quotient + Number.EPSILON * Math.max(1, Math.abs(quotient));
+	// 掛け戻しでも誤差が出る（0.1 幅で 0.7000000000000001）ため桁を固定する
+	return Number((Math.floor(corrected) * width).toFixed(4));
 }
 
 /**
@@ -49,14 +53,11 @@ export function decisionContextKey(context: DecisionContext): string {
 		`debt:${bin(context.agent.sleepDebt, 1)}`,
 		`resp:${level(context.agent.responsibility)}`,
 		`risk:${level(context.agent.riskTolerance)}`,
-		...Object.keys(context.situation)
-			.sort()
+		...Object.entries(context.situation)
+			.sort(([left], [right]) => (left < right ? -1 : 1))
 			.map(
-				(name) =>
-					`${name}:${bin(
-						context.situation[name] ?? 0,
-						SITUATION_BIN_WIDTHS[name] ?? DEFAULT_SITUATION_BIN_WIDTH,
-					)}`,
+				([name, value]) =>
+					`${name}:${bin(value, SITUATION_BIN_WIDTHS[name] ?? DEFAULT_SITUATION_BIN_WIDTH)}`,
 			),
 		`actions:${[...context.actions].sort().join('|')}`,
 	];
