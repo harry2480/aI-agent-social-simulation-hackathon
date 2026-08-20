@@ -29,7 +29,7 @@ AIマルチエージェント都市シミュレーション。睡眠不足が交
 
 ## 技術スタック
 
-- Next.js 15 (App Router) / React 19 / TypeScript
+- Next.js 16 (App Router) / React 19 / TypeScript
 - Prisma + PostgreSQL (Supabase)
 - shadcn/ui + Tailwind CSS v4 / @xyflow/react
 - Vercel AI SDK + OpenRouter
