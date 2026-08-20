@@ -25,6 +25,39 @@ function aggregate(label: string, averageReach: number): ExperimentAggregate {
 	};
 }
 
+describe('toComparisonRows の補助指標', () => {
+	it('aggregate JSON から Outbreak 発生率と収束世代を読む', () => {
+		const rows = toComparisonRows([
+			{
+				...aggregate('driver-shock', 58.5),
+				aggregate: { outbreakProbability: 1, averageDampingGeneration: 1.5 },
+			},
+		]);
+
+		expect(rows[0]?.outbreakProbability).toBe(1);
+		expect(rows[0]?.averageDampingGeneration).toBe(1.5);
+	});
+
+	it('補助指標を持たない過去の実験では null になる', () => {
+		const rows = toComparisonRows([aggregate('baseline', 9)]);
+
+		expect(rows[0]?.outbreakProbability).toBeNull();
+		expect(rows[0]?.averageDampingGeneration).toBeNull();
+	});
+
+	it('数値以外が入っていても null として扱う', () => {
+		const rows = toComparisonRows([
+			{
+				...aggregate('baseline', 9),
+				aggregate: { outbreakProbability: '1', averageDampingGeneration: null },
+			},
+		]);
+
+		expect(rows[0]?.outbreakProbability).toBeNull();
+		expect(rows[0]?.averageDampingGeneration).toBeNull();
+	});
+});
+
 function run(id: string, config: unknown): StoredRun {
 	return {
 		id,

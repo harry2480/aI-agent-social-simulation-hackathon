@@ -4,6 +4,19 @@ import type { ReproductionNumberService } from './reproduction-number.service';
 
 export interface CascadeStatus {
 	occurred: boolean;
+	/**
+	 * Rs > 1 の世代継続を問わず、Cascade Reach が閾値へ達したか。
+	 *
+	 * 実測では Generation 0 → 1 が爆発的に広がる一方 Generation 1 → 2 で急速に減衰し、
+	 * 24 章の判定（Rs > 1 が 2 世代継続）が成立しないため Cascade 発生率が常に 0 になる。
+	 * 「一度大きく広がって収束する」形を取りこぼさないための補助指標（判定自体は変更しない）。
+	 */
+	outbreakOccurred: boolean;
+	/**
+	 * Rs が閾値を超えたあと、初めて閾値以下へ落ちた世代。
+	 * 一度も閾値を超えなければ null。どこで収束が始まったかを示す。
+	 */
+	dampingGeneration: number | null;
 	reach: number;
 	depth: number;
 	generation: number;
@@ -22,12 +35,18 @@ export class CascadeService {
 
 		let longestStreak = 0;
 		let currentStreak = 0;
-		for (const rs of rsSeries) {
+		let exceeded = false;
+		let dampingGeneration: number | null = null;
+		for (const [generation, rs] of rsSeries.entries()) {
 			if (rs > thresholds.rsThreshold) {
 				currentStreak += 1;
 				longestStreak = Math.max(longestStreak, currentStreak);
+				exceeded = true;
 			} else {
 				currentStreak = 0;
+				if (exceeded && dampingGeneration === null) {
+					dampingGeneration = generation;
+				}
 			}
 		}
 
@@ -36,6 +55,8 @@ export class CascadeService {
 
 		return {
 			occurred: longestStreak >= thresholds.minGenerations && reachRate >= thresholds.minReachRate,
+			outbreakOccurred: reachRate >= thresholds.minReachRate,
+			dampingGeneration,
 			reach,
 			depth: this.cascadeDepth(state),
 			generation: this.reproductionNumberService.latestGeneration(state),

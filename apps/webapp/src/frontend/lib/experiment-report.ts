@@ -2,7 +2,12 @@ import type {
 	ExperimentAggregate,
 	StoredRun,
 } from '@/backend/presentation/composition/simulation.composition';
-import { describeRunCondition, formatPercent, toComparisonRows } from './experiment-presentation';
+import {
+	type ComparisonRow,
+	describeRunCondition,
+	formatPercent,
+	toComparisonRows,
+} from './experiment-presentation';
 
 /** 実験 1 件分の分析レポート */
 export interface ExperimentReport {
@@ -68,6 +73,8 @@ export function buildExperimentReport(params: {
 		);
 	}
 
+	findings.push(...summarizeOutbreakShape(rows));
+
 	const selfReplicating = rows.filter((row) => row.peakRs > SELF_REPLICATION_RS);
 	if (selfReplicating.length > 0) {
 		findings.push(
@@ -94,6 +101,39 @@ export function buildExperimentReport(params: {
 	}
 
 	return { headline, findings, cautions };
+}
+
+/**
+ * Cascade 判定（24 章）と Outbreak 発生率のズレを言語化する。
+ *
+ * 判定は Rs > 1 が 2 世代続くことを求めるが、実測の Cascade は
+ * 「一度大きく広がって収束する」形を取り、Generation 1 → 2 で減衰して判定が成立しない。
+ * 発生率 0% だけを見て「広がらなかった」と読み違えないための所見。
+ */
+function summarizeOutbreakShape(rows: readonly ComparisonRow[]): string[] {
+	const measured = rows.filter((row) => row.outbreakProbability !== null);
+	if (measured.length === 0) {
+		return [];
+	}
+
+	const diverged = measured.filter(
+		(row) => row.cascadeProbability === 0 && (row.outbreakProbability ?? 0) > 0,
+	);
+	if (diverged.length === 0) {
+		return [];
+	}
+
+	const damped = diverged.filter((row) => row.averageDampingGeneration !== null);
+	const dampingNote =
+		damped.length === 0
+			? ''
+			: `収束が始まる世代は平均 G${formatNumber(
+					damped.reduce((sum, row) => sum + (row.averageDampingGeneration ?? 0), 0) / damped.length,
+				)} です。`;
+
+	return [
+		`${diverged.map((row) => `${row.label}（Outbreak ${formatPercent(row.outbreakProbability ?? 0)}）`).join('、')} は Cascade 発生率 0% ですが、Reach は閾値へ達しています。Rs > 1 が 2 世代続かないため 24 章の判定は成立せず、一度大きく広がって収束する形になっています。${dampingNote}`,
+	];
 }
 
 /**

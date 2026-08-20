@@ -50,9 +50,53 @@ function run(config: unknown, accidentCount: number, overtimeHours: number): Sto
 			overtimeHours,
 			averageCommuteDelayMinutes: 5,
 			cascadeOccurred: false,
+			outbreakOccurred: false,
+			dampingGeneration: null,
 		},
 	};
 }
+
+describe('Cascade 判定と Outbreak のズレ', () => {
+	it('発生率 0% でも Reach が閾値へ達していれば所見に出す', () => {
+		const report = buildExperimentReport({
+			results: [
+				aggregate('driver-shock', {
+					cascadeProbability: 0,
+					aggregate: { outbreakProbability: 1, averageDampingGeneration: 1 },
+				}),
+			],
+			runs: [],
+		});
+
+		const finding = report.findings.find((text) => text.includes('Outbreak'));
+		expect(finding).toContain('driver-shock');
+		expect(finding).toContain('一度大きく広がって収束する');
+		expect(finding).toContain('G1.0');
+	});
+
+	it('補助指標が無い過去の実験では所見を作らない', () => {
+		const report = buildExperimentReport({
+			results: [aggregate('driver-shock', { cascadeProbability: 0 })],
+			runs: [],
+		});
+
+		expect(report.findings.some((text) => text.includes('Outbreak'))).toBe(false);
+	});
+
+	it('Cascade 発生率が 0% でなければ所見を作らない', () => {
+		const report = buildExperimentReport({
+			results: [
+				aggregate('driver-shock', {
+					cascadeProbability: 0.5,
+					aggregate: { outbreakProbability: 1, averageDampingGeneration: 1 },
+				}),
+			],
+			runs: [],
+		});
+
+		expect(report.findings.some((text) => text.includes('Outbreak'))).toBe(false);
+	});
+});
 
 describe('buildExperimentReport', () => {
 	it('最大・最小の条件を見出しにする', () => {

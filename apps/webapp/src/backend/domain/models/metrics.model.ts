@@ -32,4 +32,8 @@ export interface RunSummary {
 	overtimeHours: number;
 	averageCommuteDelayMinutes: number;
 	cascadeOccurred: boolean;
+	/** Rs の世代継続を問わず Cascade Reach が閾値へ達したか（24 章の判定を補う指標） */
+	outbreakOccurred: boolean;
+	/** Rs が閾値を超えたあと初めて閾値以下へ落ちた世代。一度も超えなければ null */
+	dampingGeneration: number | null;
 }

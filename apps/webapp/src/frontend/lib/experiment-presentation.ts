@@ -16,6 +16,38 @@ export interface ComparisonRow {
 	totalSleepLossMinutes: number;
 	/** 対照条件との Cascade Reach 差。対照が無ければ null */
 	reachDeltaVsControl: number | null;
+	/**
+	 * Rs の世代継続を問わず Cascade Reach が閾値へ達した Run の割合。
+	 * この指標を持たない古い実験では null（要件定義 24 章の判定を補う指標）
+	 */
+	outbreakProbability: number | null;
+	/** Rs が閾値を超えたあと収束し始めた世代の平均。古い実験や山が無い条件では null */
+	averageDampingGeneration: number | null;
+}
+
+interface SupplementaryAggregate {
+	outbreakProbability?: unknown;
+	averageDampingGeneration?: unknown;
+}
+
+/**
+ * 補助指標は experiment_results の aggregate（JSON）にだけ入っている。
+ * これらを追加する前に保存された実験には存在しないため、読めない場合は null を返す。
+ */
+function readSupplementary(aggregate: unknown): {
+	outbreakProbability: number | null;
+	averageDampingGeneration: number | null;
+} {
+	if (typeof aggregate !== 'object' || aggregate === null) {
+		return { outbreakProbability: null, averageDampingGeneration: null };
+	}
+	const fields = aggregate as SupplementaryAggregate;
+	return {
+		outbreakProbability:
+			typeof fields.outbreakProbability === 'number' ? fields.outbreakProbability : null,
+		averageDampingGeneration:
+			typeof fields.averageDampingGeneration === 'number' ? fields.averageDampingGeneration : null,
+	};
 }
 
 /** 比較実験の対照条件として扱うラベル。Batch Runner が付ける名前に合わせる */
@@ -33,6 +65,7 @@ export function toComparisonRows(results: readonly ExperimentAggregate[]): Compa
 	const control = findControl(results);
 
 	return results.map((result) => ({
+		...readSupplementary(result.aggregate),
 		label: result.label,
 		runCount: result.runCount,
 		cascadeProbability: result.cascadeProbability,
