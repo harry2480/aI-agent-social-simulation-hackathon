@@ -2,9 +2,6 @@
 	"name": "webapp",
 	"private": true,
 	"type": "module",
-	"prisma": {
-		"seed": "npx tsx prisma/seed.ts"
-	},
 	"scripts": {
 		"dev": "next dev",
 		"build": "prisma generate && next build",
@@ -19,7 +16,8 @@
 	},
 	"dependencies": {
 		"@ai-sdk/openai-compatible": "^3.0.31",
-		"@prisma/client": "^6",
+		"@prisma/adapter-pg": "7.9.1",
+		"@prisma/client": "^7.9.1",
 		"@xyflow/react": "^12.11.3",
 		"ai": "^7.0.66",
 		"class-variance-authority": "^0.7.1",
@@ -42,7 +40,7 @@
 		"@vitest/coverage-v8": "^4.1.10",
 		"dependency-cruiser": "^16",
 		"dotenv": "^17.3.1",
-		"prisma": "^6",
+		"prisma": "^7.9.1",
 		"tailwindcss": "^4",
 		"tsx": "^4",
 		"typescript": "^5.7",

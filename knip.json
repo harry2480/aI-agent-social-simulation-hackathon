@@ -4,7 +4,7 @@
 	"workspaces": {
 		"apps/webapp": {
 			"entry": ["scripts/*.ts"],
-			"ignoreDependencies": ["postcss-load-config"],
+			"ignoreDependencies": ["postcss-load-config", "@prisma/client"],
 			"ignore": ["src/frontend/components/ui/**"]
 		}
 	},
