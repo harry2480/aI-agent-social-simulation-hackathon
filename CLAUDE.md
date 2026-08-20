@@ -34,7 +34,7 @@ pnpm knip              # 未使用コード検出
 
 ### アーキテクチャ
 
-pnpm workspace monorepo。`apps/webapp/` に Next.js 15 App Router アプリ。
+pnpm workspace monorepo。`apps/webapp/` に Next.js 16 App Router アプリ。
 
 バックエンド (`src/backend/`) は DDD 4層構造:
 
