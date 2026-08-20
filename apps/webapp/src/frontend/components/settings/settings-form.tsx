@@ -85,50 +85,58 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 				</CardHeader>
 				<CardContent className="grid grid-cols-2 gap-3 p-4 pt-0 md:grid-cols-4">
 					<NumberField
+						id="settings-seed"
 						label="Seed"
 						value={settings.seed}
 						step={1}
 						onChange={(seed) => update({ seed })}
 					/>
 					<NumberField
+						id="settings-population"
 						label="Population"
 						value={settings.population}
 						step={10}
 						onChange={(population) => update({ population })}
 					/>
 					<NumberField
+						id="settings-days"
 						label="Days"
 						value={settings.days}
 						step={1}
 						onChange={(days) => update({ days })}
 					/>
 					<NumberField
+						id="settings-initial-rate"
 						label="初期睡眠不足率"
 						value={settings.initialSleepDeprivedRate}
 						step={0.01}
 						onChange={(initialSleepDeprivedRate) => update({ initialSleepDeprivedRate })}
 					/>
 					<NumberField
+						id="settings-initial-debt"
 						label="初期 Sleep Debt (h)"
 						value={settings.initialSleepDebtHours}
 						step={0.5}
 						onChange={(initialSleepDebtHours) => update({ initialSleepDebtHours })}
 					/>
 					<NumberField
+						id="settings-traffic-level"
 						label="Traffic Level"
 						value={settings.trafficLevel}
 						step={0.1}
 						onChange={(trafficLevel) => update({ trafficLevel })}
 					/>
 					<div className="space-y-1">
-						<Label className="text-xs">Shock Target</Label>
+						<Label htmlFor="settings-shock-target" className="text-xs">
+							Shock Target
+						</Label>
 						<Select
 							value={settings.shockTarget}
 							onValueChange={(value) =>
 								update({ shockTarget: value as ExperimentSettings['shockTarget'] })
 							}
 						>
-							<SelectTrigger>
+							<SelectTrigger id="settings-shock-target">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -141,7 +149,9 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 						</Select>
 					</div>
 					<div className="space-y-1">
-						<Label className="text-xs">Intervention</Label>
+						<Label htmlFor="settings-intervention" className="text-xs">
+							Intervention
+						</Label>
 						<Select
 							value={settings.intervention ?? 'none'}
 							onValueChange={(value) =>
@@ -153,7 +163,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 								})
 							}
 						>
-							<SelectTrigger>
+							<SelectTrigger id="settings-intervention">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -184,6 +194,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 				</CardHeader>
 				<CardContent className="grid grid-cols-3 gap-3 p-4 pt-0">
 					<NumberField
+						id="settings-threshold-tired"
 						label="Tired"
 						value={settings.sleepStateThresholds.tired}
 						step={0.5}
@@ -192,6 +203,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 						}
 					/>
 					<NumberField
+						id="settings-threshold-deprived"
 						label="Sleep Deprived"
 						value={settings.sleepStateThresholds.sleepDeprived}
 						step={0.5}
@@ -200,6 +212,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 						}
 					/>
 					<NumberField
+						id="settings-threshold-severe"
 						label="Severe"
 						value={settings.sleepStateThresholds.severe}
 						step={0.5}
@@ -216,6 +229,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 				</CardHeader>
 				<CardContent className="grid grid-cols-3 gap-3 p-4 pt-0">
 					<NumberField
+						id="settings-cascade-rs"
 						label="Rs 閾値"
 						value={settings.cascadeThresholds.rsThreshold}
 						step={0.1}
@@ -224,6 +238,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 						}
 					/>
 					<NumberField
+						id="settings-cascade-generations"
 						label="継続 Generation 数"
 						value={settings.cascadeThresholds.minGenerations}
 						step={1}
@@ -232,6 +247,7 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 						}
 					/>
 					<NumberField
+						id="settings-cascade-reach"
 						label="Reach 比率の下限"
 						value={settings.cascadeThresholds.minReachRate}
 						step={0.01}
@@ -281,17 +297,22 @@ export function SettingsForm({ currentAiModel }: SettingsFormProps) {
 }
 
 interface NumberFieldProps {
+	/** Label と Input を紐付けるための一意な id */
+	id: string;
 	label: string;
 	value: number;
 	step: number;
 	onChange: (value: number) => void;
 }
 
-function NumberField({ label, value, step, onChange }: NumberFieldProps) {
+function NumberField({ id, label, value, step, onChange }: NumberFieldProps) {
 	return (
 		<div className="space-y-1">
-			<Label className="text-xs">{label}</Label>
+			<Label htmlFor={id} className="text-xs">
+				{label}
+			</Label>
 			<Input
+				id={id}
 				type="number"
 				step={step}
 				value={value}

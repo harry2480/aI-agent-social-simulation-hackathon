@@ -126,7 +126,10 @@ function finiteNumber(value: unknown, fallback: number): number {
 
 /**
  * 保存された設定を読み戻す。
+ *
  * 壊れた値や古い形式が入っていても画面を止めず、既定値で補う。
+ * 形が合っていても範囲外（Population 501 など）なら Simulation の初期化が失敗するため、
+ * 最後に validateSettings を通し、通らなければ既定値へ戻す。
  */
 export function parseSettings(raw: unknown): ExperimentSettings {
 	if (typeof raw !== 'object' || raw === null) {
@@ -146,7 +149,7 @@ export function parseSettings(raw: unknown): ExperimentSettings {
 		'remote_work',
 	];
 
-	return {
+	const parsed: ExperimentSettings = {
 		seed: finiteNumber(stored.seed, defaults.seed),
 		population: finiteNumber(stored.population, defaults.population),
 		days: finiteNumber(stored.days, defaults.days),
@@ -181,6 +184,8 @@ export function parseSettings(raw: unknown): ExperimentSettings {
 			minReachRate: finiteNumber(cascade.minReachRate, defaults.cascadeThresholds.minReachRate),
 		},
 	};
+
+	return validateSettings(parsed) === null ? parsed : DEFAULT_EXPERIMENT_SETTINGS;
 }
 
 /** 設定を Run のパラメータへ変換する */

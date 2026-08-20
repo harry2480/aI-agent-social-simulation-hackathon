@@ -1,11 +1,31 @@
 import {
 	DEFAULT_EXPERIMENT_SETTINGS,
 	type ExperimentSettings,
+	loadStoredSettings,
 	parseSettings,
+	saveStoredSettings,
 	toExperimentConfigParams,
 	validateSettings,
 } from '@/frontend/lib/experiment-settings';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+/** localStorage を持つブラウザ環境の代わり。保存経路だけを検証する */
+function stubBrowserStorage(initial: Record<string, string> = {}): Map<string, string> {
+	const store = new Map(Object.entries(initial));
+	vi.stubGlobal('window', {
+		localStorage: {
+			getItem: (key: string) => store.get(key) ?? null,
+			setItem: (key: string, value: string) => {
+				store.set(key, value);
+			},
+		},
+	});
+	return store;
+}
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 function settings(overrides: Partial<ExperimentSettings> = {}): ExperimentSettings {
 	return { ...DEFAULT_EXPERIMENT_SETTINGS, ...overrides };
@@ -33,6 +53,15 @@ describe('validateSettings', () => {
 	it('初期睡眠不足率は 0〜1', () => {
 		expect(validateSettings(settings({ initialSleepDeprivedRate: 1.1 }))).toBe(
 			'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+		);
+	});
+
+	it('初期 Sleep Debt は 0〜12 時間', () => {
+		expect(validateSettings(settings({ initialSleepDebtHours: 13 }))).toBe(
+			'INITIAL_SLEEP_DEBT_OUT_OF_RANGE',
+		);
+		expect(validateSettings(settings({ initialSleepDebtHours: -1 }))).toBe(
+			'INITIAL_SLEEP_DEBT_OUT_OF_RANGE',
 		);
 	});
 
@@ -95,6 +124,49 @@ describe('parseSettings', () => {
 	it('object でなければ既定値を返す', () => {
 		expect(parseSettings(null)).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
 		expect(parseSettings('broken')).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
+	});
+
+	it('形は合っていても範囲外なら既定値へ戻す', () => {
+		// そのまま返すと Simulation の初期化が失敗し、原因が分かりにくくなる
+		expect(parseSettings({ ...DEFAULT_EXPERIMENT_SETTINGS, population: 501 })).toEqual(
+			DEFAULT_EXPERIMENT_SETTINGS,
+		);
+		expect(parseSettings({ ...DEFAULT_EXPERIMENT_SETTINGS, days: 1.5 })).toEqual(
+			DEFAULT_EXPERIMENT_SETTINGS,
+		);
+		expect(
+			parseSettings({
+				...DEFAULT_EXPERIMENT_SETTINGS,
+				sleepStateThresholds: { tired: 5, sleepDeprived: 2, severe: 1 },
+			}),
+		).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
+	});
+});
+
+describe('loadStoredSettings / saveStoredSettings', () => {
+	it('サーバー側（window が無い）では既定値を返す', () => {
+		expect(loadStoredSettings()).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
+	});
+
+	it('保存した設定を読み戻せる', () => {
+		stubBrowserStorage();
+		const stored = settings({ seed: 7, population: 100 });
+
+		saveStoredSettings(stored);
+
+		expect(loadStoredSettings()).toEqual(stored);
+	});
+
+	it('未保存なら既定値を返す', () => {
+		stubBrowserStorage();
+
+		expect(loadStoredSettings()).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
+	});
+
+	it('壊れた JSON が残っていても画面を止めない', () => {
+		stubBrowserStorage({ 'sleep-city.experiment-settings': '{ broken' });
+
+		expect(loadStoredSettings()).toEqual(DEFAULT_EXPERIMENT_SETTINGS);
 	});
 });
 
