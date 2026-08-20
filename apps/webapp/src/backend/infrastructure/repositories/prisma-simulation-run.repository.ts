@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma-client';
 import type { RunSummary } from '../../domain/models/metrics.model';
 import type {
 	RunPersistencePayload,
