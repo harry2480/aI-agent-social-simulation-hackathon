@@ -55,13 +55,21 @@ export type {
 	SimulationState,
 	SleepTransmission,
 } from '../../domain/models/simulation-state.model';
+export type { SleepStateThresholds } from '../../domain/models/sleep-state.model';
 export type {
+	CascadeThresholds,
 	ExperimentConfigError,
 	ExperimentConfigParams,
 	InterventionName,
 	ShockTarget,
 } from '../../domain/models/experiment-config.model';
-export { ExperimentConfig } from '../../domain/models/experiment-config.model';
+export {
+	DEFAULT_CASCADE_THRESHOLDS,
+	ExperimentConfig,
+	MAX_DAYS,
+	MAX_POPULATION,
+} from '../../domain/models/experiment-config.model';
+export { DEFAULT_SLEEP_STATE_THRESHOLDS } from '../../domain/models/sleep-state.model';
 export { sleepStateFrom, isSleepDeprivedState } from '../../domain/models/sleep-state.model';
 export { SimulationClock } from '../../domain/models/simulation-clock.model';
 

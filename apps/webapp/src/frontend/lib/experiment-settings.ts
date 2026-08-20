@@ -1,0 +1,221 @@
+import {
+	type CascadeThresholds,
+	DEFAULT_CASCADE_THRESHOLDS,
+	DEFAULT_SLEEP_STATE_THRESHOLDS,
+	type ExperimentConfigParams,
+	type InterventionName,
+	MAX_DAYS,
+	MAX_POPULATION,
+	type ShockTarget,
+	type SleepStateThresholds,
+} from '@/backend/presentation/composition/watch-mode-engine.composition';
+
+/**
+ * Simulation 実行の既定値。
+ *
+ * ここで編集するのは「これから作る Run の初期値」であり、
+ * 実行済みの Run / Experiment は保存時の Config スナップショットを持つため影響を受けない
+ * （要件定義 28 章・実装計画 10 章）。
+ */
+export interface ExperimentSettings {
+	seed: number;
+	population: number;
+	days: number;
+	initialSleepDeprivedRate: number;
+	initialSleepDebtHours: number;
+	shockTarget: ShockTarget;
+	trafficLevel: number;
+	intervention: InterventionName | null;
+	aiDecisionEnabled: boolean;
+	sleepStateThresholds: SleepStateThresholds;
+	cascadeThresholds: CascadeThresholds;
+}
+
+export const DEFAULT_EXPERIMENT_SETTINGS: ExperimentSettings = {
+	seed: 42,
+	population: 300,
+	days: 7,
+	initialSleepDeprivedRate: 0.1,
+	initialSleepDebtHours: 3,
+	shockTarget: 'driver',
+	trafficLevel: 1,
+	intervention: null,
+	aiDecisionEnabled: false,
+	sleepStateThresholds: DEFAULT_SLEEP_STATE_THRESHOLDS,
+	cascadeThresholds: DEFAULT_CASCADE_THRESHOLDS,
+};
+
+/** ブラウザに保存するキー。設定は端末ごとの既定値であり、共有しない */
+export const EXPERIMENT_SETTINGS_STORAGE_KEY = 'sleep-city.experiment-settings';
+
+export type SettingsError =
+	| 'SEED_NOT_INTEGER'
+	| 'POPULATION_OUT_OF_RANGE'
+	| 'DAYS_OUT_OF_RANGE'
+	| 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE'
+	| 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE'
+	| 'TRAFFIC_LEVEL_OUT_OF_RANGE'
+	| 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING'
+	| 'CASCADE_THRESHOLDS_OUT_OF_RANGE';
+
+/**
+ * 設定値を検証する。
+ * ExperimentConfig.create と同じ範囲に加え、画面でしか変更できない閾値も確認する。
+ * 不正な設定を保存すると、次に Run を開始した時点で初めて失敗して原因が分かりにくい。
+ */
+export function validateSettings(settings: ExperimentSettings): SettingsError | null {
+	if (!Number.isInteger(settings.seed)) {
+		return 'SEED_NOT_INTEGER';
+	}
+	if (
+		!Number.isInteger(settings.population) ||
+		settings.population < 1 ||
+		settings.population > MAX_POPULATION
+	) {
+		return 'POPULATION_OUT_OF_RANGE';
+	}
+	if (!Number.isInteger(settings.days) || settings.days < 1 || settings.days > MAX_DAYS) {
+		return 'DAYS_OUT_OF_RANGE';
+	}
+	if (settings.initialSleepDeprivedRate < 0 || settings.initialSleepDeprivedRate > 1) {
+		return 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE';
+	}
+	if (settings.initialSleepDebtHours < 0 || settings.initialSleepDebtHours > 12) {
+		return 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE';
+	}
+	if (settings.trafficLevel <= 0 || settings.trafficLevel > 3) {
+		return 'TRAFFIC_LEVEL_OUT_OF_RANGE';
+	}
+
+	const { tired, sleepDeprived, severe } = settings.sleepStateThresholds;
+	if (!(tired > 0 && tired < sleepDeprived && sleepDeprived < severe)) {
+		return 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING';
+	}
+
+	const cascade = settings.cascadeThresholds;
+	if (
+		cascade.rsThreshold <= 0 ||
+		!Number.isInteger(cascade.minGenerations) ||
+		cascade.minGenerations < 1 ||
+		cascade.minReachRate < 0 ||
+		cascade.minReachRate > 1
+	) {
+		return 'CASCADE_THRESHOLDS_OUT_OF_RANGE';
+	}
+
+	return null;
+}
+
+export const SETTINGS_ERROR_MESSAGES: Record<SettingsError, string> = {
+	SEED_NOT_INTEGER: 'Seed は整数で入力してください。',
+	POPULATION_OUT_OF_RANGE: `Population は 1〜${MAX_POPULATION} の整数で入力してください。`,
+	DAYS_OUT_OF_RANGE: `Days は 1〜${MAX_DAYS} の整数で入力してください。`,
+	INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE: '初期睡眠不足率は 0〜1 で入力してください。',
+	INITIAL_SLEEP_DEBT_OUT_OF_RANGE: '初期 Sleep Debt は 0〜12 時間で入力してください。',
+	TRAFFIC_LEVEL_OUT_OF_RANGE: 'Traffic Level は 0 より大きく 3 以下で入力してください。',
+	SLEEP_STATE_THRESHOLDS_NOT_ASCENDING:
+		'睡眠状態の閾値は Tired < Sleep Deprived < Severe の順に大きくしてください。',
+	CASCADE_THRESHOLDS_OUT_OF_RANGE:
+		'Cascade 判定は Rs > 0・Generation 1 以上・Reach 比率 0〜1 で入力してください。',
+};
+
+function finiteNumber(value: unknown, fallback: number): number {
+	return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * 保存された設定を読み戻す。
+ * 壊れた値や古い形式が入っていても画面を止めず、既定値で補う。
+ */
+export function parseSettings(raw: unknown): ExperimentSettings {
+	if (typeof raw !== 'object' || raw === null) {
+		return DEFAULT_EXPERIMENT_SETTINGS;
+	}
+	const stored = raw as Partial<Record<keyof ExperimentSettings, unknown>>;
+	const defaults = DEFAULT_EXPERIMENT_SETTINGS;
+
+	const thresholds = (stored.sleepStateThresholds ?? {}) as Partial<SleepStateThresholds>;
+	const cascade = (stored.cascadeThresholds ?? {}) as Partial<CascadeThresholds>;
+
+	const shockTargets: ShockTarget[] = ['none', 'random', 'driver', 'manager'];
+	const interventions: InterventionName[] = [
+		'mandatory_rest',
+		'overtime_limit',
+		'flexible_work',
+		'remote_work',
+	];
+
+	return {
+		seed: finiteNumber(stored.seed, defaults.seed),
+		population: finiteNumber(stored.population, defaults.population),
+		days: finiteNumber(stored.days, defaults.days),
+		initialSleepDeprivedRate: finiteNumber(
+			stored.initialSleepDeprivedRate,
+			defaults.initialSleepDeprivedRate,
+		),
+		initialSleepDebtHours: finiteNumber(
+			stored.initialSleepDebtHours,
+			defaults.initialSleepDebtHours,
+		),
+		shockTarget:
+			shockTargets.find((candidate) => candidate === stored.shockTarget) ?? defaults.shockTarget,
+		trafficLevel: finiteNumber(stored.trafficLevel, defaults.trafficLevel),
+		intervention:
+			interventions.find((candidate) => candidate === stored.intervention) ?? defaults.intervention,
+		aiDecisionEnabled: stored.aiDecisionEnabled === true,
+		sleepStateThresholds: {
+			tired: finiteNumber(thresholds.tired, defaults.sleepStateThresholds.tired),
+			sleepDeprived: finiteNumber(
+				thresholds.sleepDeprived,
+				defaults.sleepStateThresholds.sleepDeprived,
+			),
+			severe: finiteNumber(thresholds.severe, defaults.sleepStateThresholds.severe),
+		},
+		cascadeThresholds: {
+			rsThreshold: finiteNumber(cascade.rsThreshold, defaults.cascadeThresholds.rsThreshold),
+			minGenerations: finiteNumber(
+				cascade.minGenerations,
+				defaults.cascadeThresholds.minGenerations,
+			),
+			minReachRate: finiteNumber(cascade.minReachRate, defaults.cascadeThresholds.minReachRate),
+		},
+	};
+}
+
+/** 設定を Run のパラメータへ変換する */
+export function toExperimentConfigParams(settings: ExperimentSettings): ExperimentConfigParams {
+	return {
+		seed: settings.seed,
+		population: settings.population,
+		days: settings.days,
+		initialSleepDeprivedRate: settings.initialSleepDeprivedRate,
+		initialSleepDebtHours: settings.initialSleepDebtHours,
+		shockTarget: settings.shockTarget,
+		trafficLevel: settings.trafficLevel,
+		intervention: settings.intervention,
+		aiDecisionEnabled: settings.aiDecisionEnabled,
+		sleepStateThresholds: settings.sleepStateThresholds,
+		cascadeThresholds: settings.cascadeThresholds,
+	};
+}
+
+/** ブラウザから設定を読む。SSR 中や未保存なら既定値 */
+export function loadStoredSettings(): ExperimentSettings {
+	if (typeof window === 'undefined') {
+		return DEFAULT_EXPERIMENT_SETTINGS;
+	}
+	const raw = window.localStorage.getItem(EXPERIMENT_SETTINGS_STORAGE_KEY);
+	if (raw === null) {
+		return DEFAULT_EXPERIMENT_SETTINGS;
+	}
+	try {
+		return parseSettings(JSON.parse(raw));
+	} catch {
+		// 壊れた値が残っていても画面を止めない
+		return DEFAULT_EXPERIMENT_SETTINGS;
+	}
+}
+
+export function saveStoredSettings(settings: ExperimentSettings): void {
+	window.localStorage.setItem(EXPERIMENT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+}
