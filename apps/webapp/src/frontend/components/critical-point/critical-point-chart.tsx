@@ -1,7 +1,10 @@
 'use client';
 
 import type { CriticalPointSample } from '@/frontend/lib/critical-point-presentation';
-import { CRITICAL_CASCADE_PROBABILITY } from '@/frontend/lib/critical-point-presentation';
+import {
+	CRITICAL_CASCADE_PROBABILITY,
+	toCriticalPointChartData,
+} from '@/frontend/lib/critical-point-presentation';
 import {
 	CartesianGrid,
 	Legend,
@@ -27,11 +30,7 @@ export function CriticalPointChart({ samples }: CriticalPointChartProps) {
 		return <p className="text-xs text-muted-foreground">Sweep 結果がありません。</p>;
 	}
 
-	const data = samples.map((sample) => ({
-		rate: Number((sample.initialRate * 100).toFixed(1)),
-		probability: Number((sample.cascadeProbability * 100).toFixed(1)),
-		reach: Number(sample.averageReach.toFixed(1)),
-	}));
+	const data = toCriticalPointChartData(samples);
 
 	return (
 		<div className="h-72 w-full">

@@ -74,3 +74,21 @@ export function findCriticalPointRange(
 	}
 	return null;
 }
+
+/** Cascade Probability 曲線の 1 点。率は % 表示、桁はグラフの目盛りに合わせて丸める */
+export interface CriticalPointChartPoint {
+	rate: number;
+	probability: number;
+	reach: number;
+}
+
+/** Sweep 系列をグラフの系列へ変換する */
+export function toCriticalPointChartData(
+	samples: readonly CriticalPointSample[],
+): CriticalPointChartPoint[] {
+	return samples.map((sample) => ({
+		rate: Number((sample.initialRate * 100).toFixed(1)),
+		probability: Number((sample.cascadeProbability * 100).toFixed(1)),
+		reach: Number(sample.averageReach.toFixed(1)),
+	}));
+}

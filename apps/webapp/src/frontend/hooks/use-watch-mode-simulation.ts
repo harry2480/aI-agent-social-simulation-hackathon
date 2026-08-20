@@ -1,33 +1,21 @@
 'use client';
 
 import {
-	type Agent,
 	ExperimentConfig,
 	type ExperimentConfigParams,
-	type MetricsSnapshot,
-	type SimulationEvent,
 	type SimulationState,
 	createWatchModeEngine,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { SETTINGS_ERROR_MESSAGES } from '@/frontend/lib/experiment-settings';
+import {
+	type PlaybackSpeed,
+	type WatchModeView,
+	tickIntervalMs,
+	toWatchModeView,
+} from '@/frontend/lib/watch-mode-view';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type PlaybackSpeed = 1 | 4 | 8;
-
-export interface WatchModeView {
-	tick: number;
-	clockLabel: string;
-	agents: Agent[];
-	recentEvents: SimulationEvent[];
-	metrics: MetricsSnapshot | null;
-	congestedRoadIds: string[];
-	finished: boolean;
-}
-
-/** 1x のときに 1 Tick を進める間隔（ミリ秒） */
-const BASE_TICK_INTERVAL_MS = 200;
-/** Timeline へ保持する重要 Event の最大件数 */
-const TIMELINE_LIMIT = 60;
+export type { PlaybackSpeed, WatchModeView };
 
 /**
  * Watch Mode の Simulation をブラウザ内で駆動する。
@@ -46,16 +34,7 @@ export function useWatchModeSimulation() {
 	const [speed, setSpeed] = useState<PlaybackSpeed>(4);
 
 	const publish = useCallback((state: SimulationState, finished: boolean) => {
-		const significant = state.events.filter((event) => event.isSignificant);
-		setView({
-			tick: state.clock.tick,
-			clockLabel: state.clock.format(),
-			agents: state.orderedAgents(),
-			recentEvents: significant.slice(-TIMELINE_LIMIT).reverse(),
-			metrics: state.metricsHistory.at(-1) ?? null,
-			congestedRoadIds: [...state.congestions.keys()],
-			finished,
-		});
+		setView(toWatchModeView(state, finished));
 	}, []);
 
 	const clearTimer = useCallback(() => {
@@ -132,7 +111,7 @@ export function useWatchModeSimulation() {
 			if (cancelled || !runningRef.current) {
 				return;
 			}
-			timerRef.current = setTimeout(loop, BASE_TICK_INTERVAL_MS / speed);
+			timerRef.current = setTimeout(loop, tickIntervalMs(speed));
 		};
 		void loop();
 
