@@ -37,7 +37,8 @@
 			"coverage",
 			"prisma/generated",
 			".claude",
-			"next-env.d.ts"
+			"next-env.d.ts",
+			".vercel"
 		]
 	}
 }
