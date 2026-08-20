@@ -27,7 +27,8 @@ export default defineConfig({
 				'src/backend/domain/models/result.model.ts',
 				// DB 接続が必要。Integration テストの担当（docs/テストガイドライン.md）
 				'src/backend/infrastructure/db/**',
-				'src/backend/infrastructure/repositories/**',
+				// マッパーは Prisma に依存しない純粋な変換なので Unit テストの担当
+				'src/backend/infrastructure/repositories/prisma-*.repository.ts',
 				'src/backend/presentation/composition/simulation.composition.ts',
 				'src/backend/presentation/loaders/**',
 				'src/backend/presentation/actions/**',
