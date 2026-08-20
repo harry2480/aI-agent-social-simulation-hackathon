@@ -4,6 +4,7 @@ import type {
 } from '@/backend/presentation/composition/simulation.composition';
 import { describeRunCondition, formatPercent, toComparisonRows } from './experiment-presentation';
 
+/** 実験 1 件分の分析レポート */
 export interface ExperimentReport {
 	/** 実験全体の要約 1 行 */
 	headline: string;

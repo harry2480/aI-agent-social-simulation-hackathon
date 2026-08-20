@@ -1,5 +1,6 @@
 import type { ExperimentAggregate } from '@/backend/presentation/composition/simulation.composition';
 
+/** Super-spreader ランキングの 1 行 */
 export interface SuperSpreaderRankingRow {
 	rank: number;
 	agentId: string;

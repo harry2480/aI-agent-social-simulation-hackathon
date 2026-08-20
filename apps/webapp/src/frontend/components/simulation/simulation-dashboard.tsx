@@ -33,6 +33,12 @@ import {
 	type PlaybackSpeed,
 	useWatchModeSimulation,
 } from '@/frontend/hooks/use-watch-mode-simulation';
+import {
+	DEFAULT_EXPERIMENT_SETTINGS,
+	type ExperimentSettings,
+	loadStoredSettings,
+	toExperimentConfigParams,
+} from '@/frontend/lib/experiment-settings';
 import { Pause, Play, RotateCcw, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -64,15 +70,20 @@ interface FormState {
 	aiDecisionEnabled: boolean;
 }
 
-const DEFAULT_FORM: FormState = {
-	seed: 42,
-	population: 300,
-	days: 7,
-	initialSleepDeprivedRate: 0.1,
-	shockTarget: 'driver',
-	intervention: 'none',
-	aiDecisionEnabled: false,
-};
+/** Settings 画面の保存値をフォームの初期値へ落とす */
+function formFromSettings(settings: ExperimentSettings): FormState {
+	return {
+		seed: settings.seed,
+		population: settings.population,
+		days: settings.days,
+		initialSleepDeprivedRate: settings.initialSleepDeprivedRate,
+		shockTarget: settings.shockTarget,
+		intervention: settings.intervention ?? 'none',
+		aiDecisionEnabled: settings.aiDecisionEnabled,
+	};
+}
+
+const DEFAULT_FORM: FormState = formFromSettings(DEFAULT_EXPERIMENT_SETTINGS);
 
 export interface ReplaySource {
 	runId: string;
@@ -119,6 +130,8 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 		stateRef,
 		summarize,
 	} = useWatchModeSimulation();
+	// localStorage はサーバーで読めないため、初期値は既定値にしてマウント後に差し替える
+	const [settings, setSettings] = useState<ExperimentSettings>(DEFAULT_EXPERIMENT_SETTINGS);
 	const [form, setForm] = useState<FormState>(() =>
 		replay === undefined ? DEFAULT_FORM : formFromParams(replay.params),
 	);
@@ -129,8 +142,9 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 
 	const buildParams = useCallback(
 		(next: FormState): ExperimentConfigParams => ({
-			// Traffic Level や閾値などフォームに無い条件は Replay 元の値を保つ。
-			// これが無いとリセット時に条件が変わり、同じ Run を再実行できなくなる
+			// Traffic Level や閾値などフォームに無い条件は、Settings 画面の保存値と
+			// Replay 元の条件から引き継ぐ。これが無いとリセット時に条件が変わってしまう
+			...toExperimentConfigParams(settings),
 			...replay?.params,
 			seed: next.seed,
 			population: next.population,
@@ -140,13 +154,20 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 			intervention: next.intervention === 'none' ? null : next.intervention,
 			aiDecisionEnabled: next.aiDecisionEnabled,
 		}),
-		[replay],
+		[replay, settings],
 	);
 
-	// Replay で開かれた場合は保存された条件で初期化する
+	// Replay なら保存された Run の条件、そうでなければ Settings 画面の保存値で初期化する
 	useEffect(() => {
-		initialize(replay === undefined ? buildParams(DEFAULT_FORM) : replay.params);
-	}, [initialize, buildParams, replay]);
+		if (replay !== undefined) {
+			initialize(replay.params);
+			return;
+		}
+		const stored = loadStoredSettings();
+		setSettings(stored);
+		setForm(formFromSettings(stored));
+		initialize(toExperimentConfigParams(stored));
+	}, [initialize, replay]);
 
 	const state = stateRef.current;
 	const thresholds = state?.config.sleepStateThresholds ?? null;
@@ -249,6 +270,9 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 				</Link>
 				<Link href="/super-spreader" className="text-xs text-muted-foreground underline">
 					Super-spreader Explorer
+				</Link>
+				<Link href="/settings" className="text-xs text-muted-foreground underline">
+					Settings
 				</Link>
 				<div className="ml-auto flex items-center gap-2">
 					{isRunning ? (

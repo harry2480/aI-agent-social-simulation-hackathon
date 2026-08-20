@@ -1,5 +1,6 @@
 import type { ExperimentAggregate } from '@/backend/presentation/composition/simulation.composition';
 
+/** Sweep 1 点分の集計 */
 export interface CriticalPointSample {
 	/** 初期睡眠不足率（0〜1） */
 	initialRate: number;
@@ -10,6 +11,7 @@ export interface CriticalPointSample {
 	runCount: number;
 }
 
+/** 臨界点が含まれる初期率の区間 */
 export interface CriticalPointRange {
 	/** Cascade Probability が 50% を下回っていた直前の初期率 */
 	lowerRate: number | null;
