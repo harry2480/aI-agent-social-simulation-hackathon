@@ -11,7 +11,7 @@
 		"test:unit": "vitest run --dir test/unit",
 		"test:coverage": "vitest run --dir test/unit --coverage",
 		"test:integration": "INTEGRATION_TEST=true vitest run --dir test/integration",
-		"depcruise": "depcruise src --config .dependency-cruiser.cjs",
+		"depcruise": "depcruise src --config .dependency-cruiser.cjs --output-type json | tsx scripts/check-dependency-graph.ts",
 		"prisma": "prisma"
 	},
 	"dependencies": {
@@ -38,12 +38,12 @@
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
 		"@vitest/coverage-v8": "^4.1.10",
-		"dependency-cruiser": "^16",
+		"dependency-cruiser": "^18.2.0",
 		"dotenv": "^17.3.1",
 		"prisma": "^7.9.1",
 		"tailwindcss": "^4",
 		"tsx": "^4",
-		"typescript": "^7.0.2",
+		"typescript": "^5.9.3",
 		"vitest": "^4.1.10"
 	}
 }
