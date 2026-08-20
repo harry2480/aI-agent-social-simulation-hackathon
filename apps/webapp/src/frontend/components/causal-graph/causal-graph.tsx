@@ -16,7 +16,7 @@ import type {
 import { EventOriginLegend } from '@/frontend/components/event-origin/event-origin-legend';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
 import { eventTypePresentation } from '@/frontend/lib/event-origin-presentation';
-import { formatEventLabel } from '@/frontend/lib/format';
+import { formatEventLabel, formatTickLabel } from '@/frontend/lib/format';
 import { useMemo } from 'react';
 
 interface CausalGraphProps {
@@ -31,9 +31,6 @@ const ROW_HEIGHT = 78;
 
 function nodeLabel(node: CausalGraphNode): string {
 	const origin = eventTypePresentation(node.type);
-	const day = Math.floor(node.tick / 96) + 1;
-	const hour = String(Math.floor((node.tick % 96) / 4)).padStart(2, '0');
-	const minute = String((node.tick % 4) * 15).padStart(2, '0');
 	const impact =
 		node.sleepLossMinutes !== undefined
 			? ` sleep -${node.sleepLossMinutes}min`
@@ -41,7 +38,7 @@ function nodeLabel(node: CausalGraphNode): string {
 				? ` +${node.delayMinutes}min`
 				: '';
 	// AI 判断ノードと確率イベントノードを取り違えると因果の読み方を誤るため、由来を先頭に出す
-	return `${origin.marker} ${formatEventLabel(node.type)}\nD${day} ${hour}:${minute}${impact}\n${node.actorId ?? '-'}`;
+	return `${origin.marker} ${formatEventLabel(node.type)}\n${formatTickLabel(node.tick)}${impact}\n${node.actorId ?? '-'}`;
 }
 
 /**

@@ -1,3 +1,21 @@
+import { SimulationClock } from '@/backend/presentation/composition/watch-mode-engine.composition';
+
+/**
+ * Tick を `D1 09:00` 形式へ変換する。
+ *
+ * 日・時・分の換算は SimulationClock に委ねる。ここで Tick 数を直接割ると
+ * 1 Tick の長さを変えたときに表示だけが古い刻みのまま残る。
+ */
+export function formatTickLabel(tick: number): string {
+	if (!Number.isInteger(tick) || tick < 0) {
+		return '-';
+	}
+	const clock = SimulationClock.fromTick(tick);
+	const hour = String(clock.hour).padStart(2, '0');
+	const minute = String(clock.minute).padStart(2, '0');
+	return `D${clock.day + 1} ${hour}:${minute}`;
+}
+
 export function formatNumber(value: number, fractionDigits = 2): string {
 	if (!Number.isFinite(value)) {
 		return '-';

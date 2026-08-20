@@ -3,6 +3,7 @@ import {
 	loadRecentExperiments,
 } from '@/backend/presentation/loaders/experiment.loader';
 import { CriticalPointView } from '@/frontend/components/critical-point/critical-point-view';
+import { findExperimentOfKind } from '@/frontend/lib/experiment-presentation';
 import Link from 'next/link';
 
 /** DB の内容は Batch Runner の実行で変わるため、ビルド時に固定しない */
@@ -15,7 +16,7 @@ export const metadata = {
 export default async function CriticalPointPage() {
 	const experiments = await loadRecentExperiments();
 	// 最新の Sweep を対象にする。過去分は Experiment Dashboard から辿れる
-	const experiment = experiments.find((candidate) => candidate.kind === 'critical-point') ?? null;
+	const experiment = findExperimentOfKind(experiments, 'critical-point');
 
 	return (
 		<main className="mx-auto w-full max-w-6xl space-y-4 p-6">

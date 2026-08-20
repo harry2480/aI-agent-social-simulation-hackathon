@@ -18,6 +18,13 @@ import {
 	type ExperimentConfigParams,
 } from '../src/backend/domain/models/experiment-config.model';
 import type { RunSummary } from '../src/backend/domain/models/metrics.model';
+import {
+	type Aggregate,
+	aggregateSummaries,
+	argValue,
+	formatAggregateLine,
+	parseSeeds,
+} from './lib/experiment-aggregate';
 
 /** 比較で固定する条件。変えるのはモデルだけ（要件定義 28 章） */
 const BASE: ExperimentConfigParams = {
@@ -29,58 +36,17 @@ const BASE: ExperimentConfigParams = {
 	aiDecisionEnabled: true,
 };
 
-interface Aggregate {
-	label: string;
-	runCount: number;
-	cascadeProbability: number;
-	/** Rs の世代継続を問わず Cascade Reach が閾値へ達した Run の割合（24 章の判定を補う指標） */
-	outbreakProbability: number;
-	/** Rs が閾値を超えたあと収束し始めた世代の平均。一度も超えなかった場合は null */
-	averageDampingGeneration: number | null;
-	averageRs: number;
-	peakRs: number;
-	averageReach: number;
-	totalSleepLossMinutes: number;
-	standardDeviation: number;
-}
-
 function parseArgs(): { models: string[]; seeds: number } {
 	const args = process.argv.slice(2);
-	const get = (name: string): string | undefined =>
-		args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
 
-	const models = (get('models') ?? '')
+	const models = (argValue(args, 'models') ?? '')
 		.split(',')
 		.map((value) => value.trim())
 		.filter((value) => value.length > 0);
 	if (models.length === 0) {
 		throw new Error('--models=<model-id>[,<model-id>...] を指定してください');
 	}
-	return { models, seeds: parseSeeds(get('seeds'), 3) };
-}
-
-/**
- * Seed 数を読み取る。
- * 不正値のまま進むと Run が 1 本も回らず、NaN や -Infinity の集計が DB へ保存される。
- */
-function parseSeeds(raw: string | undefined, fallback: number): number {
-	if (raw === undefined) {
-		return fallback;
-	}
-	const seeds = Number(raw);
-	if (!Number.isInteger(seeds) || seeds < 1) {
-		throw new Error('--seeds には 1 以上の整数を指定してください');
-	}
-	return seeds;
-}
-
-function standardDeviation(values: number[]): number {
-	if (values.length === 0) {
-		return 0;
-	}
-	const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-	const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
-	return Math.sqrt(variance);
+	return { models, seeds: parseSeeds(argValue(args, 'seeds'), 3) };
 }
 
 async function runOnce(
@@ -95,20 +61,6 @@ async function runOnce(
 	}
 	const result = await runner.execute({ config: configResult.value, experimentId, persist });
 	return result.summary;
-}
-
-/**
- * Rs が閾値を超えたあと収束し始めた世代の平均。
- * 一度も閾値を超えなかった Run は「収束する山が無かった」ため対象から除く。
- */
-function averageDampingGeneration(summaries: readonly RunSummary[]): number | null {
-	const generations = summaries
-		.map((summary) => summary.dampingGeneration)
-		.filter((generation): generation is number => generation !== null);
-	if (generations.length === 0) {
-		return null;
-	}
-	return generations.reduce((sum, value) => sum + value, 0) / generations.length;
 }
 
 async function main(): Promise<void> {
@@ -151,31 +103,10 @@ async function main(): Promise<void> {
 			);
 		}
 
-		const reaches = summaries.map((summary) => summary.cascadeReach);
-		const aggregate: Aggregate = {
-			label: model,
-			runCount: summaries.length,
-			cascadeProbability:
-				summaries.filter((summary) => summary.cascadeOccurred).length / summaries.length,
-			outbreakProbability:
-				summaries.filter((summary) => summary.outbreakOccurred).length / summaries.length,
-			averageDampingGeneration: averageDampingGeneration(summaries),
-			averageRs: summaries.reduce((sum, s) => sum + s.averageRs, 0) / summaries.length,
-			peakRs: Math.max(...summaries.map((summary) => summary.peakRs)),
-			averageReach: reaches.reduce((sum, value) => sum + value, 0) / reaches.length,
-			totalSleepLossMinutes:
-				summaries.reduce((sum, s) => sum + s.totalSleepLossMinutes, 0) / summaries.length,
-			standardDeviation: standardDeviation(reaches),
-		};
+		const aggregate = aggregateSummaries(model, summaries);
 		results.push(aggregate);
 
-		console.log(
-			`  ${model.padEnd(36)} reach=${aggregate.averageReach.toFixed(1)} ` +
-				`sd=${aggregate.standardDeviation.toFixed(1)} avgRs=${aggregate.averageRs.toFixed(2)} ` +
-				`peakRs=${aggregate.peakRs.toFixed(2)} cascadeP=${(aggregate.cascadeProbability * 100).toFixed(0)}% ` +
-				`outbreakP=${(aggregate.outbreakProbability * 100).toFixed(0)}% ` +
-				`(${Date.now() - startedAt}ms)`,
-		);
+		console.log(`${formatAggregateLine(aggregate, 36)} (${Date.now() - startedAt}ms)`);
 	}
 
 	if (experimentId === null) {

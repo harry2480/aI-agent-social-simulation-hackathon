@@ -1,15 +1,21 @@
 import type {
 	ExperimentAggregate,
+	StoredExperiment,
 	StoredRun,
 } from '@/backend/presentation/composition/simulation.composition';
 import {
 	describeRunCondition,
+	findExperimentOfKind,
 	formatDelta,
 	formatPercent,
 	groupRunsByCondition,
 	toComparisonRows,
 } from '@/frontend/lib/experiment-presentation';
 import { describe, expect, it } from 'vitest';
+
+function experiment(id: string, kind: string): StoredExperiment {
+	return { id, name: `${kind} experiment`, kind, config: null, results: [] };
+}
 
 function aggregate(label: string, averageReach: number): ExperimentAggregate {
 	return {
@@ -149,5 +155,26 @@ describe('formatPercent / formatDelta', () => {
 		expect(formatDelta(15)).toBe('+15.0');
 		expect(formatDelta(-12)).toBe('-12.0');
 		expect(formatDelta(null)).toBe('-');
+	});
+});
+
+describe('findExperimentOfKind', () => {
+	it('指定した kind の実験を返す', () => {
+		const experiments = [experiment('a', 'shock-comparison'), experiment('b', 'critical-point')];
+
+		expect(findExperimentOfKind(experiments, 'critical-point')?.id).toBe('b');
+	});
+
+	it('同じ kind が複数あれば先頭（最新）を返す', () => {
+		// loadRecentExperiments は新しい順に返す
+		const experiments = [experiment('new', 'super-spreader'), experiment('old', 'super-spreader')];
+
+		expect(findExperimentOfKind(experiments, 'super-spreader')?.id).toBe('new');
+	});
+
+	it('該当が無ければ null を返す', () => {
+		// undefined ではなく null。画面は null を空状態の分岐に使う
+		expect(findExperimentOfKind([experiment('a', 'intervention')], 'critical-point')).toBeNull();
+		expect(findExperimentOfKind([], 'critical-point')).toBeNull();
 	});
 });
