@@ -33,6 +33,10 @@ interface Aggregate {
 	label: string;
 	runCount: number;
 	cascadeProbability: number;
+	/** Rs の世代継続を問わず Cascade Reach が閾値へ達した Run の割合（24 章の判定を補う指標） */
+	outbreakProbability: number;
+	/** Rs が閾値を超えたあと収束し始めた世代の平均。一度も超えなかった場合は null */
+	averageDampingGeneration: number | null;
 	averageRs: number;
 	peakRs: number;
 	averageReach: number;
@@ -136,6 +140,20 @@ function standardDeviation(values: number[]): number {
 	return Math.sqrt(variance);
 }
 
+/**
+ * Rs が閾値を超えたあと収束し始めた世代の平均。
+ * 一度も閾値を超えなかった Run は「収束する山が無かった」ため対象から除く。
+ */
+function averageDampingGeneration(summaries: readonly RunSummary[]): number | null {
+	const generations = summaries
+		.map((summary) => summary.dampingGeneration)
+		.filter((generation): generation is number => generation !== null);
+	if (generations.length === 0) {
+		return null;
+	}
+	return generations.reduce((sum, value) => sum + value, 0) / generations.length;
+}
+
 async function aggregate(
 	condition: Condition,
 	seeds: number,
@@ -153,6 +171,9 @@ async function aggregate(
 		runCount: summaries.length,
 		cascadeProbability:
 			summaries.filter((summary) => summary.cascadeOccurred).length / summaries.length,
+		outbreakProbability:
+			summaries.filter((summary) => summary.outbreakOccurred).length / summaries.length,
+		averageDampingGeneration: averageDampingGeneration(summaries),
 		averageRs: summaries.reduce((sum, s) => sum + s.averageRs, 0) / summaries.length,
 		peakRs: Math.max(...summaries.map((summary) => summary.peakRs)),
 		averageReach: reaches.reduce((sum, value) => sum + value, 0) / reaches.length,
@@ -199,6 +220,7 @@ async function main(): Promise<void> {
 			`  ${result.label.padEnd(20)} reach=${result.averageReach.toFixed(1)} ` +
 				`sd=${result.standardDeviation.toFixed(1)} avgRs=${result.averageRs.toFixed(2)} ` +
 				`peakRs=${result.peakRs.toFixed(2)} cascadeP=${(result.cascadeProbability * 100).toFixed(0)}% ` +
+				`outbreakP=${(result.outbreakProbability * 100).toFixed(0)}% ` +
 				`(${Date.now() - startedAt}ms)`,
 		);
 	}

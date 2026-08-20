@@ -1243,6 +1243,8 @@ export class SimulationEngine {
 			peakRs,
 			averageRs,
 			cascadeOccurred: cascade.occurred,
+			outbreakOccurred: cascade.outbreakOccurred,
+			dampingGeneration: cascade.dampingGeneration,
 		};
 	}
 }
