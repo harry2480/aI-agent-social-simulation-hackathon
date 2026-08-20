@@ -4,6 +4,7 @@ import {
 	originOfEventType,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 
+/** Event の由来を画面へ出すための表示定義 */
 export interface EventOriginPresentation {
 	label: string;
 	/** 何が決めたのかを一言で説明する。ツールチップ用 */
@@ -48,10 +49,12 @@ const PRESENTATIONS: Record<EventOrigin, EventOriginPresentation> = {
 
 export const EVENT_ORIGIN_ORDER: EventOrigin[] = ['ai_decision', 'probabilistic', 'deterministic'];
 
+/** 由来から表示定義を引く */
 export function eventOriginPresentation(origin: EventOrigin): EventOriginPresentation {
 	return PRESENTATIONS[origin];
 }
 
+/** Event 種別から表示定義を引く。呼び出し側が由来を意識しなくて済む */
 export function eventTypePresentation(type: EventType): EventOriginPresentation {
 	return PRESENTATIONS[originOfEventType(type)];
 }

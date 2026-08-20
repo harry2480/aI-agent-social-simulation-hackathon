@@ -41,6 +41,15 @@ export async function loadRunForReplay(runId: string): Promise<StoredRun | null>
 	return simulationRunRepository.findById(runId);
 }
 
+/**
+ * 保存済み Run の全体を読む。
+ *
+ * Watch Mode は実行中の State を直接見るため画面からは使わないが、
+ * Agent / Event / Causal Edge / Decision の読み取り経路として意図的に残している
+ * （docs/tasks の「設計からの差分」を参照）。
+ *
+ * @public
+ */
 export async function loadRunDetail(runId: string): Promise<RunDetail | null> {
 	if (!isDatabaseConfigured()) {
 		return null;

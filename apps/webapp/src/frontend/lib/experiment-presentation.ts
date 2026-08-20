@@ -3,6 +3,7 @@ import type {
 	StoredRun,
 } from '@/backend/presentation/composition/simulation.composition';
 
+/** 条件比較表の 1 行 */
 export interface ComparisonRow {
 	label: string;
 	runCount: number;
@@ -92,6 +93,7 @@ export function groupRunsByCondition(runs: readonly StoredRun[]): Map<string, St
 	return grouped;
 }
 
+/** 0〜1 の割合を百分率の文字列にする */
 export function formatPercent(value: number, fractionDigits = 0): string {
 	if (!Number.isFinite(value)) {
 		return '-';
@@ -99,6 +101,7 @@ export function formatPercent(value: number, fractionDigits = 0): string {
 	return `${(value * 100).toFixed(fractionDigits)}%`;
 }
 
+/** 増減を符号付きで表す。差が無い（対照条件が無い）場合は `-` */
 export function formatDelta(value: number | null, fractionDigits = 1): string {
 	if (value === null || !Number.isFinite(value)) {
 		return '-';

@@ -6,7 +6,6 @@ import { PrismaExperimentRepository } from '../../infrastructure/repositories/pr
 import { PrismaMetricsRepository } from '../../infrastructure/repositories/prisma-metrics.repository';
 import { PrismaSimulationRunRepository } from '../../infrastructure/repositories/prisma-simulation-run.repository';
 import {
-	createDecideAgentActionUseCase,
 	createDecideAgentActionUseCaseForModel,
 	createRuleBasedDecisionGateway,
 } from './decision.composition';
@@ -26,11 +25,6 @@ export const eventRepository = new PrismaEventRepository();
 export const agentRepository = new PrismaAgentRepository();
 export const agentDecisionRepository = new PrismaAgentDecisionRepository();
 export const metricsRepository = new PrismaMetricsRepository();
-
-/** Watch Mode 相当（AI Decision あり）の Run 実行 */
-export function createRunSimulationUseCase(): RunSimulationUseCase {
-	return new RunSimulationUseCase(createDecideAgentActionUseCase(), simulationRunRepository);
-}
 
 /** Experiment Mode（Rule-based 固定）の Run 実行 */
 export function createExperimentRunSimulationUseCase(): RunSimulationUseCase {

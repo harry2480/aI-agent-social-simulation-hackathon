@@ -7,5 +7,6 @@
 			"ignoreDependencies": ["postcss", "postcss-load-config"],
 			"ignore": ["src/frontend/components/ui/**"]
 		}
-	}
+	},
+	"exclude": ["types"]
 }

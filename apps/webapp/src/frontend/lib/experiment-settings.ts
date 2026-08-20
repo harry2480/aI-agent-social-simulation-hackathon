@@ -46,8 +46,9 @@ export const DEFAULT_EXPERIMENT_SETTINGS: ExperimentSettings = {
 };
 
 /** ブラウザに保存するキー。設定は端末ごとの既定値であり、共有しない */
-export const EXPERIMENT_SETTINGS_STORAGE_KEY = 'sleep-city.experiment-settings';
+const EXPERIMENT_SETTINGS_STORAGE_KEY = 'sleep-city.experiment-settings';
 
+/** 設定値の検証エラー。画面はこれをメッセージへ変換して表示する */
 export type SettingsError =
 	| 'SEED_NOT_INTEGER'
 	| 'POPULATION_OUT_OF_RANGE'
@@ -216,6 +217,7 @@ export function loadStoredSettings(): ExperimentSettings {
 	}
 }
 
+/** 設定をブラウザへ保存する。呼び出し前に validateSettings で検証すること */
 export function saveStoredSettings(settings: ExperimentSettings): void {
 	window.localStorage.setItem(EXPERIMENT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 }

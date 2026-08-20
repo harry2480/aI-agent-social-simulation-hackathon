@@ -70,8 +70,7 @@ export {
 	MAX_POPULATION,
 } from '../../domain/models/experiment-config.model';
 export { DEFAULT_SLEEP_STATE_THRESHOLDS } from '../../domain/models/sleep-state.model';
-export { sleepStateFrom, isSleepDeprivedState } from '../../domain/models/sleep-state.model';
-export { SimulationClock } from '../../domain/models/simulation-clock.model';
+export { sleepStateFrom } from '../../domain/models/sleep-state.model';
 
 /**
  * Watch Mode の実行結果を保存用ペイロードへ変換する。
