@@ -4,6 +4,8 @@ AIマルチエージェント都市シミュレーション。睡眠不足が交
 
 現実都市を正確に予測するものではなく、**「睡眠不足は都市内で伝播するか」という仮説を検証するための実験装置**として設計されています。
 
+**公開URL**: https://sleep-city.vercel.app
+
 ## 何を調べるのか
 
 - Sleep Cascade が継続的に拡大する条件は存在するか
@@ -93,6 +95,12 @@ pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
 
 # 同一 Seed・同一条件のままモデルだけを変えて比較する（要 OPENROUTER_API_KEY）
 pnpm --filter webapp exec tsx scripts/compare-ai-models.ts --models=<model-id>,<model-id> --seeds=3
+```
+
+スクリプトは `.env.local` を自動では読み込みません。DB へ保存する場合は環境変数を渡してください。
+
+```sh
+set -a; . apps/webapp/.env.local; set +a
 ```
 
 `DATABASE_URL` が未設定の場合は DB へ保存せず、集計結果を標準出力に出します。
