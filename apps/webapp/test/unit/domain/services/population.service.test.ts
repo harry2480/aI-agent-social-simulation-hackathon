@@ -1,3 +1,4 @@
+import type { Agent } from '@/backend/domain/models/agent.model';
 import { City } from '@/backend/domain/models/city.model';
 import type { ExperimentConfig } from '@/backend/domain/models/experiment-config.model';
 import { PopulationService } from '@/backend/domain/services/population.service';
@@ -84,13 +85,36 @@ describe('PopulationService.generate', () => {
 	});
 
 	it('同じ Seed なら同じ Population と Network になる', () => {
+		// ID・職種・自宅だけを比べると、RNG の消費順が変わって性格や必要睡眠時間が
+		// ずれても気づけない。再現性の要はむしろそちらなので属性ごと比較する
+		const snapshot = (agents: readonly Agent[]) =>
+			agents.map((agent) => ({
+				id: agent.id,
+				role: agent.role,
+				homeId: agent.homeId,
+				workplaceId: agent.workplaceId,
+				sleepNeedHours: agent.sleepNeedHours,
+				responsibility: agent.responsibility,
+				riskTolerance: agent.riskTolerance,
+				cooperativeness: agent.cooperativeness,
+				familyResponsibility: agent.familyResponsibility,
+				sleepDebtHours: agent.sleepDebtHours,
+				fatigue: agent.fatigue,
+				workPressure: agent.workPressure,
+			}));
 		const first = generate(20);
 		const second = generate(20);
 
-		expect(first.agents.map((agent) => `${agent.id}:${agent.role}:${agent.homeId}`)).toEqual(
-			second.agents.map((agent) => `${agent.id}:${agent.role}:${agent.homeId}`),
-		);
+		expect(snapshot(first.agents)).toEqual(snapshot(second.agents));
 		expect(first.relationships).toEqual(second.relationships);
+	});
+
+	it('Seed が違えば Agent の属性も変わる', () => {
+		// 上の比較が「常に同じ値」を見ているだけでないことを確かめる
+		const first = generate(20, 1);
+		const other = generate(20, 2);
+
+		expect(first.agents[0]?.sleepNeedHours).not.toBe(other.agents[0]?.sleepNeedHours);
 	});
 
 	it('同居する Agent 同士に双方向の family 関係を張る', () => {
@@ -143,10 +167,23 @@ describe('PopulationService.generate', () => {
 	});
 
 	it('勤務先を持たない Agent は colleague 関係を持たない', () => {
-		const { agents, relationships } = generate(20);
+		// 既定の都市には全職種ぶんの施設があるため、そのままでは
+		// 勤務先なしの Agent が 1 人も出ず、この検証が空回りする。
+		// 店舗と物流拠点が無い都市にして、実際に勤務先なしを作る
+		const config = createTestConfig({
+			seed: 1,
+			population: 20,
+			days: 1,
+			initialSleepDeprivedRate: 0,
+			cityLayout: { ...CITY_LAYOUT, commercialDistricts: 0, logisticsDistricts: 0 },
+		});
+		const city = City.generate(config.cityLayout, new SeededRandomService(1));
+		const { agents, relationships } = service.generate(config, city, new SeededRandomService(1));
+
 		const withoutWorkplace = agents.filter((agent) => agent.workplaceId === undefined);
 		const colleagues = relationships.filter((relationship) => relationship.kind === 'colleague');
 
+		expect(withoutWorkplace.length).toBeGreaterThan(0);
 		for (const agent of withoutWorkplace) {
 			expect(
 				colleagues.some(

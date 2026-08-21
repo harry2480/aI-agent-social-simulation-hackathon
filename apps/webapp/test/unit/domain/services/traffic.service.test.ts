@@ -91,10 +91,15 @@ describe('TrafficService.addAccidentCongestion', () => {
 	it('事故道路には全量、接続する道路には 20% を波及させる', () => {
 		const state = buildState();
 		const accidentRoad = roadOf(state, 'residential-0', 'residential-1');
+		// 事故道路と residential-0 を共有する道路。affected を回すだけの検証だと、
+		// 実装が事故道路しか返さなくなっても空ループで通ってしまう
+		const connectedRoad = roadOf(state, 'residential-0', 'office-0');
 
 		const affected = service.addAccidentCongestion(state, accidentRoad, 25, 'e1');
 
 		expect(state.congestions.get(accidentRoad.id)?.extraMinutes).toBe(25);
+		expect(affected.map((road) => road.id)).toContain(connectedRoad.id);
+		expect(state.congestions.get(connectedRoad.id)?.extraMinutes).toBe(5);
 		for (const road of affected.filter((candidate) => candidate.id !== accidentRoad.id)) {
 			expect(state.congestions.get(road.id)?.extraMinutes).toBe(5);
 		}

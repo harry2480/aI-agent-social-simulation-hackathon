@@ -59,12 +59,14 @@ describe('SimulationState.decisionOrderedAgents', () => {
 });
 
 describe('SimulationState の Network 索引', () => {
+	// colleague の相手は family でも部下でもない Agent にする。
+	// 家族と同じ相手にすると、colleague が索引へ混入しても結果が変わらず気づけない
 	const relationships: AgentRelationship[] = [
 		{ fromAgentId: 'agent-0000', toAgentId: 'agent-0001', kind: 'family' },
 		{ fromAgentId: 'agent-0001', toAgentId: 'agent-0000', kind: 'family' },
 		{ fromAgentId: 'agent-0002', toAgentId: 'agent-0000', kind: 'manager_of' },
 		{ fromAgentId: 'agent-0002', toAgentId: 'agent-0001', kind: 'manager_of' },
-		{ fromAgentId: 'agent-0000', toAgentId: 'agent-0001', kind: 'colleague' },
+		{ fromAgentId: 'agent-0000', toAgentId: 'agent-0005', kind: 'colleague' },
 	];
 
 	it('familyOf は同居する家族を返す', () => {
@@ -95,10 +97,13 @@ describe('SimulationState の Network 索引', () => {
 	});
 
 	it('colleague は Household / Work の索引に混ざらない', () => {
+		// agent-0005 は agent-0000 の同僚でしかない。
+		// Work Network の同僚関係を家族や部下として扱うと、伝播経路が実際より太くなる
 		const state = buildState([], relationships);
 
-		expect(state.familyOf('agent-0000')).not.toContain('agent-0002');
-		expect(state.subordinatesOf('agent-0000')).toEqual([]);
+		expect(state.familyOf('agent-0000')).not.toContain('agent-0005');
+		expect(state.subordinatesOf('agent-0000')).not.toContain('agent-0005');
+		expect(state.managerOf('agent-0005')).toBeUndefined();
 	});
 });
 

@@ -52,7 +52,7 @@ describe('ProbabilisticEventService.accidentProbability', () => {
 });
 
 describe('ProbabilisticEventService.workFailureProbability', () => {
-	it('疲労とストレスの倍率だけで決まり、上限 0.4 でクリップされる', () => {
+	it('疲労とストレスの倍率だけで決まる', () => {
 		const rested = service.workFailureProbability(createTestAgent({ fatigue: 0, stress: 0 }));
 		const exhausted = service.workFailureProbability(
 			createTestAgent({ fatigue: 100, stress: 100 }),
@@ -60,6 +60,16 @@ describe('ProbabilisticEventService.workFailureProbability', () => {
 
 		expect(rested).toBeCloseTo(0.002, 10);
 		expect(exhausted).toBeCloseTo(0.002 * 6 * 2.5, 10);
+	});
+
+	it('最悪条件でも 3% 程度にとどまる', () => {
+		// Fatigue / Stress は Agent 側で 0〜100 にクランプされるため、
+		// workFailureProbability は実装にある上限 0.4 へ到達しない。
+		// 事故と違って作業ミスは「たまに起きる」程度に収める設計であることを固定しておく
+		const worst = service.workFailureProbability(createTestAgent({ fatigue: 100, stress: 100 }));
+
+		expect(worst).toBeCloseTo(0.03, 10);
+		expect(worst).toBeLessThan(0.4);
 	});
 
 	it('リスク許容度は作業ミスに影響しない', () => {
