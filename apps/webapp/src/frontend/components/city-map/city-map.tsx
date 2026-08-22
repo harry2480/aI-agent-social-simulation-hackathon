@@ -6,6 +6,14 @@ import type {
 	SleepStateName,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import {
+	AGENT_RADIUS,
+	type AgentPosition,
+	agentPositions,
+	createCanvasTransform,
+	nearestAgentWithin,
+	nextAgentId,
+} from '@/frontend/lib/city-map-layout';
+import {
 	SLEEP_STATE_ORDER,
 	sleepStateColorVars,
 	sleepStatePresentation,
@@ -21,13 +29,10 @@ interface CityMapProps {
 	onSelectAgent: (agentId: string) => void;
 }
 
-/** 施設座標を 0〜100 の空間で扱い、描画時にキャンバスサイズへスケールする */
-const WORLD_SIZE = 110;
-const AGENT_RADIUS = 3;
-
 /**
  * City Map。300〜500 Agent を毎 Tick 描画するため、DOM 要素ではなく Canvas を使う。
  * 色は CSS 変数から解決し、描画コード内に色リテラルを持たない。
+ * 座標計算と選択判定は city-map-layout に置き、ここは描画とイベント処理に絞る。
  */
 export function CityMap({
 	city,
@@ -38,7 +43,7 @@ export function CityMap({
 	onSelectAgent,
 }: CityMapProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const agentPositionsRef = useRef<{ id: string; x: number; y: number }[]>([]);
+	const agentPositionsRef = useRef<AgentPosition[]>([]);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -57,9 +62,8 @@ export function CityMap({
 		context.setTransform(dpr, 0, 0, dpr, 0, 0);
 		context.clearRect(0, 0, rect.width, rect.height);
 
-		const scale = Math.min(rect.width, rect.height) / WORLD_SIZE;
-		const toX = (x: number) => x * scale + (rect.width - WORLD_SIZE * scale) / 2;
-		const toY = (y: number) => y * scale + (rect.height - WORLD_SIZE * scale) / 2;
+		const transform = createCanvasTransform(rect.width, rect.height);
+		const { scale, toX, toY } = transform;
 
 		const styles = getComputedStyle(canvas);
 		const borderColor = styles.getPropertyValue('--color-border').trim() || '#d4d4d8';
@@ -108,33 +112,18 @@ export function CityMap({
 			context.fillText(district.type, toX(district.x), toY(district.y) - 12);
 		}
 
-		// Agent
-		const positions: { id: string; x: number; y: number }[] = [];
-		const facilityById = new Map(city.facilities.map((facility) => [facility.id, facility]));
-		// 同一施設へ重なる Agent を見分けられるよう、施設内で小さく円状に配置する。
-		// 位置は Agent ID から決まるため描画ごとに揺れない
-		const perFacilityCount = new Map<string, number>();
-		for (const agent of agents) {
-			const facility = facilityById.get(agent.currentLocationId);
-			if (facility === undefined) {
-				continue;
-			}
-			const indexInFacility = perFacilityCount.get(facility.id) ?? 0;
-			perFacilityCount.set(facility.id, indexInFacility + 1);
-			const angle = indexInFacility * 2.399963229728653;
-			const radius = Math.sqrt(indexInFacility) * 2.2;
-			const x = toX(facility.x) + Math.cos(angle) * radius;
-			const y = toY(facility.y) + Math.sin(angle) * radius;
-			positions.push({ id: agent.id, x, y });
-
+		// Agent。選択判定に使うため描画位置を保持する
+		const positions = agentPositions(agents, city.facilities, transform);
+		const stateById = new Map(agents.map((agent) => [agent.id, sleepStateOf(agent)]));
+		for (const position of positions) {
 			context.beginPath();
-			context.arc(x, y, AGENT_RADIUS, 0, Math.PI * 2);
-			context.fillStyle = stateColors[sleepStateOf(agent)];
+			context.arc(position.x, position.y, AGENT_RADIUS, 0, Math.PI * 2);
+			context.fillStyle = stateColors[stateById.get(position.id) ?? 'normal'];
 			context.fill();
 
-			if (agent.id === selectedAgentId) {
+			if (position.id === selectedAgentId) {
 				context.beginPath();
-				context.arc(x, y, AGENT_RADIUS + 4, 0, Math.PI * 2);
+				context.arc(position.x, position.y, AGENT_RADIUS + 4, 0, Math.PI * 2);
 				context.strokeStyle = foreground;
 				context.lineWidth = 2;
 				context.stroke();
@@ -156,15 +145,9 @@ export function CityMap({
 						return;
 					}
 					event.preventDefault();
-					if (agents.length === 0) {
-						return;
-					}
-					const currentIndex = agents.findIndex((agent) => agent.id === selectedAgentId);
-					const delta = event.key === 'ArrowRight' ? 1 : -1;
-					const nextIndex = (currentIndex + delta + agents.length) % agents.length;
-					const next = agents[nextIndex];
-					if (next !== undefined) {
-						onSelectAgent(next.id);
+					const next = nextAgentId(agents, selectedAgentId, event.key === 'ArrowRight' ? 1 : -1);
+					if (next !== null) {
+						onSelectAgent(next);
 					}
 				}}
 				onClick={(event) => {
@@ -173,17 +156,12 @@ export function CityMap({
 						return;
 					}
 					const rect = canvas.getBoundingClientRect();
-					const x = event.clientX - rect.left;
-					const y = event.clientY - rect.top;
-					let nearest: { id: string; distance: number } | null = null;
-					for (const position of agentPositionsRef.current) {
-						const distance = Math.hypot(position.x - x, position.y - y);
-						if (nearest === null || distance < nearest.distance) {
-							nearest = { id: position.id, distance };
-						}
-					}
-					if (nearest !== null && nearest.distance <= 12) {
-						onSelectAgent(nearest.id);
+					const nearest = nearestAgentWithin(agentPositionsRef.current, {
+						x: event.clientX - rect.left,
+						y: event.clientY - rect.top,
+					});
+					if (nearest !== null) {
+						onSelectAgent(nearest);
 					}
 				}}
 			/>
