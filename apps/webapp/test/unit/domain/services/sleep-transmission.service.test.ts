@@ -21,6 +21,29 @@ const layout = {
 	storesPerCommercialDistrict: 1,
 };
 
+/** 指定した Sleep Debt を持つ Agent だけの State。人口カウントの検証に使う */
+function buildStateWithDebts(debts: readonly number[]): SimulationState {
+	const config = createTestConfig({
+		seed: 1,
+		population: Math.max(1, debts.length),
+		days: 1,
+		initialSleepDeprivedRate: 0,
+		cityLayout: layout,
+	});
+	const city = City.generate(config.cityLayout, new SeededRandomService(1));
+	const agents = debts.map((debt, index) =>
+		Agent.create({
+			id: `agent-${index}`,
+			role: 'office_worker',
+			homeId: 'home-residential-0-0',
+			rng: new SeededRandomService(index + 1),
+			initialSleepDebtHours: debt,
+			thresholds: config.sleepStateThresholds,
+		}),
+	);
+	return new SimulationState(config, city, agents, SimulationClock.start());
+}
+
 function buildState(): SimulationState {
 	const config = createTestConfig({
 		seed: 1,
@@ -223,6 +246,204 @@ describe('SleepTransmissionService', () => {
 			state.agent('victim').addSleepDebtHours(3);
 			service.commitNightTransition(state, 'victim');
 			expect(state.generations.get('victim')).toBe(5);
+		});
+	});
+
+	describe('因果チェーンの探索', () => {
+		it('actor が居ない Event からは伝播元を辿らない', () => {
+			// 遡れば伝播元は見つかるが、受け手が特定できない。
+			// ここで弾かないと toAgentId が undefined の伝播が積まれる
+			const state = buildState();
+			const origin = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 1,
+					type: 'accident',
+					actorId: 'source',
+				}),
+			);
+			const loss = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 3,
+					type: 'sleep_opportunity_loss',
+					causes: [origin],
+				}),
+			);
+
+			service.detect(state, loss, 90);
+
+			expect(state.transmissions).toHaveLength(0);
+		});
+
+		it('同じ Event へ 2 経路で到達しても二重に辿らず伝播元は 1 人に決まる', () => {
+			// 遅延が合流する形は実際に起きる。visited が無いと同じ枝を何度も展開する
+			const state = buildState();
+			const origin = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 1,
+					type: 'accident',
+					actorId: 'source',
+				}),
+			);
+			const shared = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 2,
+					type: 'commute_delay',
+					actorId: 'victim',
+					causes: [origin],
+				}),
+			);
+			const pathA = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 3,
+					type: 'late_arrival',
+					actorId: 'victim',
+					causes: [shared],
+				}),
+			);
+			const pathB = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 3,
+					type: 'work_delay',
+					actorId: 'victim',
+					causes: [shared],
+				}),
+			);
+			const loss = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 4,
+					type: 'sleep_opportunity_loss',
+					actorId: 'victim',
+					causes: [pathA, pathB],
+				}),
+			);
+
+			service.detect(state, loss, 90);
+
+			expect(state.transmissions).toHaveLength(1);
+			expect(state.transmissions[0]?.fromAgentId).toBe('source');
+		});
+
+		it('因果が循環していても探索が止まる', () => {
+			// visited が無いと同じ枝を無限に展開して Tick が返ってこなくなる。
+			// 循環そのものは想定外だが、1 本の壊れたデータで Run 全体が止まるのは避ける
+			const state = buildState();
+			const first = state.recordEvent(
+				SimulationEvent.reconstruct({
+					id: 'cycle-a',
+					tick: 1,
+					type: 'work_delay',
+					actorId: 'victim',
+					targetIds: [],
+					causedByEventIds: ['cycle-b'],
+					impact: {},
+					depth: 1,
+				}),
+			);
+			state.recordEvent(
+				SimulationEvent.reconstruct({
+					id: 'cycle-b',
+					tick: 1,
+					type: 'work_delay',
+					actorId: 'victim',
+					targetIds: [],
+					causedByEventIds: ['cycle-a'],
+					impact: {},
+					depth: 1,
+				}),
+			);
+			const loss = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 2,
+					type: 'sleep_opportunity_loss',
+					actorId: 'victim',
+					causes: [first],
+				}),
+			);
+
+			service.detect(state, loss, 90);
+
+			expect(state.transmissions).toHaveLength(0);
+		});
+
+		it('記録されていない Event を参照していても探索を止めない', () => {
+			// 参照先が引けない枝を打ち切り扱いにすると、辿れるはずの伝播元を見失う
+			const state = buildState();
+			const origin = state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick: 1,
+					type: 'accident',
+					actorId: 'source',
+				}),
+			);
+			const loss = state.recordEvent(
+				SimulationEvent.reconstruct({
+					id: state.nextEventId(),
+					tick: 2,
+					type: 'sleep_opportunity_loss',
+					actorId: 'victim',
+					targetIds: [],
+					causedByEventIds: ['missing-event', origin.id],
+					impact: {},
+					depth: 1,
+				}),
+			);
+
+			service.detect(state, loss, 90);
+
+			expect(state.transmissions).toHaveLength(1);
+			expect(state.transmissions[0]?.fromAgentId).toBe('source');
+		});
+
+		it('参照先がすべて引けない場合は伝播候補にしない', () => {
+			const state = buildState();
+			const loss = state.recordEvent(
+				SimulationEvent.reconstruct({
+					id: state.nextEventId(),
+					tick: 2,
+					type: 'sleep_opportunity_loss',
+					actorId: 'victim',
+					targetIds: [],
+					causedByEventIds: ['missing-event'],
+					impact: {},
+					depth: 1,
+				}),
+			);
+
+			service.detect(state, loss, 90);
+
+			expect(state.transmissions).toHaveLength(0);
+		});
+	});
+
+	describe('deprivedPopulation', () => {
+		it('Sleep Deprived 以上の Agent だけを数える', () => {
+			// 既定閾値は tired 1h / sleepDeprived 2h / severe 5h。
+			// tired は「睡眠不足ケース」ではないため数に入れない
+			const state = buildStateWithDebts([0, 1, 2, 6]);
+
+			expect(service.deprivedPopulation(state)).toBe(2);
+		});
+
+		it('閾値ちょうどは睡眠不足として数える', () => {
+			expect(service.deprivedPopulation(buildStateWithDebts([1.99]))).toBe(0);
+			expect(service.deprivedPopulation(buildStateWithDebts([2]))).toBe(1);
+		});
+
+		it('該当者が居なければ 0', () => {
+			expect(service.deprivedPopulation(buildStateWithDebts([0, 0]))).toBe(0);
+		});
+
+		it('全員が該当すれば人口と一致する', () => {
+			expect(service.deprivedPopulation(buildStateWithDebts([3, 4, 9]))).toBe(3);
 		});
 	});
 });
