@@ -14,15 +14,13 @@
 import { ExploreSuperSpreaderUseCase } from '../src/backend/application/usecases/explore-super-spreader.usecase';
 import { ExperimentConfig } from '../src/backend/domain/models/experiment-config.model';
 import { RuleBasedAiDecisionGateway } from '../src/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
+import { argValue } from './lib/experiment-aggregate';
 
 /** Stage 2 で使う Seed 群。保存する config と実行条件を一致させるため 1 箇所に置く */
 const STAGE2_SEEDS = [1, 2, 3];
 
 function arg(name: string, fallback: number): number {
-	const raw = process.argv
-		.slice(2)
-		.find((value) => value.startsWith(`--${name}=`))
-		?.split('=')[1];
+	const raw = argValue(process.argv.slice(2), name);
 	return raw === undefined ? fallback : Number(raw);
 }
 

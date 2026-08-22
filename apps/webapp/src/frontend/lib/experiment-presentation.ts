@@ -1,7 +1,20 @@
 import type {
 	ExperimentAggregate,
+	StoredExperiment,
 	StoredRun,
 } from '@/backend/presentation/composition/simulation.composition';
+
+/**
+ * 指定した kind の実験のうち最も新しいものを選ぶ。
+ * loadRecentExperiments は新しい順に返すため、先頭が最新になる。
+ * 該当が無い場合は null を返し、画面は実行方法を案内する空状態を出す。
+ */
+export function findExperimentOfKind(
+	experiments: readonly StoredExperiment[],
+	kind: string,
+): StoredExperiment | null {
+	return experiments.find((experiment) => experiment.kind === kind) ?? null;
+}
 
 /** 条件比較表の 1 行 */
 export interface ComparisonRow {

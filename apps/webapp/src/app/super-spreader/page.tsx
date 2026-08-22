@@ -3,6 +3,7 @@ import {
 	loadRecentExperiments,
 } from '@/backend/presentation/loaders/experiment.loader';
 import { SuperSpreaderRanking } from '@/frontend/components/super-spreader/super-spreader-ranking';
+import { findExperimentOfKind } from '@/frontend/lib/experiment-presentation';
 import Link from 'next/link';
 
 /** DB の内容は探索スクリプトの実行で変わるため、ビルド時に固定しない */
@@ -14,7 +15,7 @@ export const metadata = {
 
 export default async function SuperSpreaderPage() {
 	const experiments = await loadRecentExperiments();
-	const experiment = experiments.find((candidate) => candidate.kind === 'super-spreader') ?? null;
+	const experiment = findExperimentOfKind(experiments, 'super-spreader');
 
 	return (
 		<main className="mx-auto w-full max-w-6xl space-y-4 p-6">

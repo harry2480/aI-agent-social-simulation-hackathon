@@ -1,6 +1,12 @@
 import {
+	type ExperimentConfigError,
+	MAX_DAYS,
+	MAX_POPULATION,
+} from '@/backend/presentation/composition/watch-mode-engine.composition';
+import {
 	DEFAULT_EXPERIMENT_SETTINGS,
 	type ExperimentSettings,
+	SETTINGS_ERROR_MESSAGES,
 	loadStoredSettings,
 	parseSettings,
 	saveStoredSettings,
@@ -182,5 +188,31 @@ describe('toExperimentConfigParams', () => {
 		expect(params.trafficLevel).toBe(1.5);
 		expect(params.sleepStateThresholds?.severe).toBe(6);
 		expect(params.intervention).toBeNull();
+	});
+});
+
+describe('SETTINGS_ERROR_MESSAGES', () => {
+	/**
+	 * ExperimentConfig.create が返しうるエラー。
+	 * Watch Mode の Hook はこのメッセージ表を直接引くため、
+	 * SettingsError が ExperimentConfigError を包含していないと表示が undefined になる。
+	 */
+	const CONFIG_ERRORS: ExperimentConfigError[] = [
+		'SEED_NOT_INTEGER',
+		'POPULATION_OUT_OF_RANGE',
+		'DAYS_OUT_OF_RANGE',
+		'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+	];
+
+	it('ExperimentConfig のエラーをすべて文言に変換できる', () => {
+		for (const error of CONFIG_ERRORS) {
+			expect(SETTINGS_ERROR_MESSAGES[error]).toBeTruthy();
+		}
+	});
+
+	it('範囲の文言は定数から出す', () => {
+		// 上限をハードコードすると MAX_POPULATION を変えたときに表示だけ古い値で残る
+		expect(SETTINGS_ERROR_MESSAGES.POPULATION_OUT_OF_RANGE).toContain(String(MAX_POPULATION));
+		expect(SETTINGS_ERROR_MESSAGES.DAYS_OUT_OF_RANGE).toContain(String(MAX_DAYS));
 	});
 });

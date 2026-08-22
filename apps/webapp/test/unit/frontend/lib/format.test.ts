@@ -4,6 +4,7 @@ import {
 	formatMinutesAsHours,
 	formatNumber,
 	formatRoleLabel,
+	formatTickLabel,
 } from '@/frontend/lib/format';
 import { describe, expect, it } from 'vitest';
 
@@ -74,5 +75,29 @@ describe('formatEventLabel', () => {
 
 	it('未知の値はそのまま返す', () => {
 		expect(formatEventLabel('unknown_event')).toBe('unknown_event');
+	});
+});
+
+describe('formatTickLabel', () => {
+	it.each([
+		[0, 'D1 00:00'],
+		[1, 'D1 00:15'],
+		[36, 'D1 09:00'],
+		[95, 'D1 23:45'],
+		[96, 'D2 00:00'],
+		[672, 'D8 00:00'],
+	])('tick %i は %s', (tick, label) => {
+		expect(formatTickLabel(tick)).toBe(label);
+	});
+
+	it('Tick 数を直接割らず SimulationClock の換算に従う', () => {
+		// 1 Tick の長さを変えたときに表示だけ古い刻みで残らないようにする
+		expect(formatTickLabel(96 * 3 + 4 * 13 + 2)).toBe('D4 13:30');
+	});
+
+	it('負や非整数の Tick では表示を落とさず - を返す', () => {
+		expect(formatTickLabel(-1)).toBe('-');
+		expect(formatTickLabel(1.5)).toBe('-');
+		expect(formatTickLabel(Number.NaN)).toBe('-');
 	});
 });

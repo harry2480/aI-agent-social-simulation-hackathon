@@ -21,27 +21,19 @@ import {
 import type { RunSummary } from '../src/backend/domain/models/metrics.model';
 import { SimulationEngine } from '../src/backend/domain/services/simulation-engine.service';
 import { RuleBasedAiDecisionGateway } from '../src/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
+import {
+	type Aggregate,
+	aggregateSummaries,
+	argValue,
+	formatAggregateLine,
+	parseSeeds,
+} from './lib/experiment-aggregate';
 
 type ExperimentKind = 'shock-comparison' | 'critical-point' | 'intervention';
 
 interface Condition {
 	label: string;
 	overrides: Partial<ExperimentConfigParams>;
-}
-
-interface Aggregate {
-	label: string;
-	runCount: number;
-	cascadeProbability: number;
-	/** Rs の世代継続を問わず Cascade Reach が閾値へ達した Run の割合（24 章の判定を補う指標） */
-	outbreakProbability: number;
-	/** Rs が閾値を超えたあと収束し始めた世代の平均。一度も超えなかった場合は null */
-	averageDampingGeneration: number | null;
-	averageRs: number;
-	peakRs: number;
-	averageReach: number;
-	totalSleepLossMinutes: number;
-	standardDeviation: number;
 }
 
 const BASE: ExperimentConfigParams = {
@@ -74,33 +66,16 @@ const CONDITIONS: Record<ExperimentKind, Condition[]> = {
 
 function parseArgs(): { kind: ExperimentKind; seeds: number; saveRuns: boolean } {
 	const args = process.argv.slice(2);
-	const get = (name: string): string | undefined =>
-		args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
 
-	const kind = (get('kind') ?? 'shock-comparison') as ExperimentKind;
+	const kind = (argValue(args, 'kind') ?? 'shock-comparison') as ExperimentKind;
 	if (!(kind in CONDITIONS)) {
 		throw new Error(`unknown kind: ${kind}. use ${Object.keys(CONDITIONS).join(' | ')}`);
 	}
 	return {
 		kind,
-		seeds: parseSeeds(get('seeds'), 10),
-		saveRuns: get('save-runs') !== 'false',
+		seeds: parseSeeds(argValue(args, 'seeds'), 10),
+		saveRuns: argValue(args, 'save-runs') !== 'false',
 	};
-}
-
-/**
- * Seed 数を読み取る。
- * 不正値のまま進むと Run が 1 本も回らず、NaN や -Infinity の集計が DB へ保存される。
- */
-function parseSeeds(raw: string | undefined, fallback: number): number {
-	if (raw === undefined) {
-		return fallback;
-	}
-	const seeds = Number(raw);
-	if (!Number.isInteger(seeds) || seeds < 1) {
-		throw new Error('--seeds には 1 以上の整数を指定してください');
-	}
-	return seeds;
 }
 
 /**
@@ -131,29 +106,6 @@ async function runOnce(
 	return engine.run(engine.initialize());
 }
 
-function standardDeviation(values: number[]): number {
-	if (values.length === 0) {
-		return 0;
-	}
-	const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-	const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
-	return Math.sqrt(variance);
-}
-
-/**
- * Rs が閾値を超えたあと収束し始めた世代の平均。
- * 一度も閾値を超えなかった Run は「収束する山が無かった」ため対象から除く。
- */
-function averageDampingGeneration(summaries: readonly RunSummary[]): number | null {
-	const generations = summaries
-		.map((summary) => summary.dampingGeneration)
-		.filter((generation): generation is number => generation !== null);
-	if (generations.length === 0) {
-		return null;
-	}
-	return generations.reduce((sum, value) => sum + value, 0) / generations.length;
-}
-
 async function aggregate(
 	condition: Condition,
 	seeds: number,
@@ -165,22 +117,7 @@ async function aggregate(
 		summaries.push(await runOnce({ ...BASE, ...condition.overrides, seed }, runner, experimentId));
 	}
 
-	const reaches = summaries.map((summary) => summary.cascadeReach);
-	return {
-		label: condition.label,
-		runCount: summaries.length,
-		cascadeProbability:
-			summaries.filter((summary) => summary.cascadeOccurred).length / summaries.length,
-		outbreakProbability:
-			summaries.filter((summary) => summary.outbreakOccurred).length / summaries.length,
-		averageDampingGeneration: averageDampingGeneration(summaries),
-		averageRs: summaries.reduce((sum, s) => sum + s.averageRs, 0) / summaries.length,
-		peakRs: Math.max(...summaries.map((summary) => summary.peakRs)),
-		averageReach: reaches.reduce((sum, value) => sum + value, 0) / reaches.length,
-		totalSleepLossMinutes:
-			summaries.reduce((sum, s) => sum + s.totalSleepLossMinutes, 0) / summaries.length,
-		standardDeviation: standardDeviation(reaches),
-	};
+	return aggregateSummaries(condition.label, summaries);
 }
 
 async function main(): Promise<void> {
@@ -216,13 +153,7 @@ async function main(): Promise<void> {
 		const startedAt = Date.now();
 		const result = await aggregate(condition, seeds, runner, experimentId);
 		results.push(result);
-		console.log(
-			`  ${result.label.padEnd(20)} reach=${result.averageReach.toFixed(1)} ` +
-				`sd=${result.standardDeviation.toFixed(1)} avgRs=${result.averageRs.toFixed(2)} ` +
-				`peakRs=${result.peakRs.toFixed(2)} cascadeP=${(result.cascadeProbability * 100).toFixed(0)}% ` +
-				`outbreakP=${(result.outbreakProbability * 100).toFixed(0)}% ` +
-				`(${Date.now() - startedAt}ms)`,
-		);
+		console.log(`${formatAggregateLine(result, 20)} (${Date.now() - startedAt}ms)`);
 	}
 
 	if (composition === null || experimentId === null) {

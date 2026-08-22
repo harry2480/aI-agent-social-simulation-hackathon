@@ -7,19 +7,12 @@ import {
 import { EventOriginLegend } from '@/frontend/components/event-origin/event-origin-legend';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
 import { eventTypePresentation } from '@/frontend/lib/event-origin-presentation';
-import { formatEventLabel } from '@/frontend/lib/format';
+import { formatEventLabel, formatTickLabel } from '@/frontend/lib/format';
 
 interface EventTimelineProps {
 	events: readonly SimulationEvent[];
 	/** Event を選ぶと Causal Graph の起点になる。actorId があれば Agent Detail も切り替える */
 	onSelectEvent: (eventId: string, actorId?: string) => void;
-}
-
-function formatTick(tick: number): string {
-	const day = Math.floor(tick / 96) + 1;
-	const hour = Math.floor((tick % 96) / 4);
-	const minute = (tick % 4) * 15;
-	return `D${day} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 /** 重要 Event のみを表示する。全 Tick ログは表示しない（要件定義 37 章） */
@@ -51,7 +44,7 @@ export function EventTimeline({ events, onSelectEvent }: EventTimelineProps) {
 										onClick={() => onSelectEvent(event.id, event.actorId)}
 									>
 										<span className="font-mono tabular-nums text-muted-foreground">
-											{formatTick(event.tick)}
+											{formatTickLabel(event.tick)}
 										</span>{' '}
 										<span className={origin.textClass} title={origin.description}>
 											{/* 記号だけでは読み上げられないため、由来をテキストでも出す */}
