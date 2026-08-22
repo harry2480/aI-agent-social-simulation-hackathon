@@ -71,7 +71,7 @@ export {
 } from '../../domain/models/experiment-config.model';
 export { DEFAULT_SLEEP_STATE_THRESHOLDS } from '../../domain/models/sleep-state.model';
 export { sleepStateFrom } from '../../domain/models/sleep-state.model';
-export { SimulationClock } from '../../domain/models/simulation-clock.model';
+export { SimulationClock, TICKS_PER_DAY } from '../../domain/models/simulation-clock.model';
 
 /**
  * Watch Mode の実行結果を保存用ペイロードへ変換する。

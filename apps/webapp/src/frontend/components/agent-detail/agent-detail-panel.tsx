@@ -6,8 +6,12 @@ import type {
 	SleepStateName,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
+import {
+	agentDetailRows,
+	formatAgentIdList,
+	transmissionsOf,
+} from '@/frontend/lib/agent-detail-presentation';
 import { eventOriginPresentation } from '@/frontend/lib/event-origin-presentation';
-import { formatNumber, formatRoleLabel } from '@/frontend/lib/format';
 import { sleepStatePresentation } from '@/frontend/lib/sleep-state-presentation';
 
 interface AgentDetailPanelProps {
@@ -32,25 +36,8 @@ export function AgentDetailPanel({ agent, sleepState, state }: AgentDetailPanelP
 
 	const presentation = sleepStatePresentation(sleepState);
 	const aiOrigin = eventOriginPresentation('ai_decision');
-	const parentTransmissions =
-		state?.transmissions.filter((transmission) => transmission.toAgentId === agent.id) ?? [];
-	const childTransmissions =
-		state?.transmissions.filter((transmission) => transmission.fromAgentId === agent.id) ?? [];
-
-	const rows: { label: string; value: string }[] = [
-		{ label: 'Role', value: formatRoleLabel(agent.role) },
-		{ label: 'Current Location', value: agent.currentLocationId },
-		{ label: 'Current Action', value: agent.currentAction },
-		{ label: 'Sleep Need', value: `${formatNumber(agent.sleepNeedHours, 1)} h` },
-		{ label: 'Sleep Debt', value: `${formatNumber(agent.sleepDebtHours, 2)} h` },
-		{ label: 'Fatigue', value: formatNumber(agent.fatigue, 0) },
-		{ label: 'Stress', value: formatNumber(agent.stress, 0) },
-		{ label: 'Responsibility', value: formatNumber(agent.responsibility) },
-		{ label: 'Risk Tolerance', value: formatNumber(agent.riskTolerance) },
-		{ label: 'Cooperativeness', value: formatNumber(agent.cooperativeness) },
-		{ label: 'Family Responsibility', value: formatNumber(agent.familyResponsibility) },
-		{ label: 'Generation', value: String(state?.generations.get(agent.id) ?? '-') },
-	];
+	const { parentIds, childIds } = transmissionsOf(state?.transmissions ?? [], agent.id);
+	const rows = agentDetailRows(agent, state?.generations.get(agent.id));
 
 	return (
 		<Card className="flex min-h-0 flex-col">
@@ -92,19 +79,11 @@ export function AgentDetailPanel({ agent, sleepState, state }: AgentDetailPanelP
 				<div className="grid grid-cols-2 gap-2">
 					<div>
 						<p className="text-muted-foreground">Parent Transmission</p>
-						<p className="text-foreground">
-							{parentTransmissions.length === 0
-								? '-'
-								: parentTransmissions.map((transmission) => transmission.fromAgentId).join(', ')}
-						</p>
+						<p className="text-foreground">{formatAgentIdList(parentIds)}</p>
 					</div>
 					<div>
 						<p className="text-muted-foreground">Child Transmissions</p>
-						<p className="text-foreground">
-							{childTransmissions.length === 0
-								? '-'
-								: childTransmissions.map((transmission) => transmission.toAgentId).join(', ')}
-						</p>
+						<p className="text-foreground">{formatAgentIdList(childIds)}</p>
 					</div>
 				</div>
 			</CardContent>

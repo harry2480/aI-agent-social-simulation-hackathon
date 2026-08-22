@@ -39,6 +39,12 @@ import {
 	loadStoredSettings,
 	toExperimentConfigParams,
 } from '@/frontend/lib/experiment-settings';
+import {
+	type SimulationFormState,
+	formFromParams,
+	formFromSettings,
+	toRunParams,
+} from '@/frontend/lib/simulation-form';
 import { Pause, Play, RotateCcw, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -60,30 +66,7 @@ const INTERVENTIONS: { value: InterventionName | 'none'; label: string }[] = [
 	{ value: 'remote_work', label: 'Remote Work' },
 ];
 
-interface FormState {
-	seed: number;
-	population: number;
-	days: number;
-	initialSleepDeprivedRate: number;
-	shockTarget: ShockTarget;
-	intervention: InterventionName | 'none';
-	aiDecisionEnabled: boolean;
-}
-
-/** Settings 画面の保存値をフォームの初期値へ落とす */
-function formFromSettings(settings: ExperimentSettings): FormState {
-	return {
-		seed: settings.seed,
-		population: settings.population,
-		days: settings.days,
-		initialSleepDeprivedRate: settings.initialSleepDeprivedRate,
-		shockTarget: settings.shockTarget,
-		intervention: settings.intervention ?? 'none',
-		aiDecisionEnabled: settings.aiDecisionEnabled,
-	};
-}
-
-const DEFAULT_FORM: FormState = formFromSettings(DEFAULT_EXPERIMENT_SETTINGS);
+const DEFAULT_FORM: SimulationFormState = formFromSettings(DEFAULT_EXPERIMENT_SETTINGS);
 
 export interface ReplaySource {
 	runId: string;
@@ -93,19 +76,6 @@ export interface ReplaySource {
 	savedAiModel: string | null;
 	/** いまサーバーが使う AI Model。保存時と違えば AI の判断は同じにならない */
 	currentAiModel: string;
-}
-
-/** 保存された Config をフォームの初期値へ戻す */
-function formFromParams(params: ExperimentConfigParams): FormState {
-	return {
-		seed: params.seed,
-		population: params.population,
-		days: params.days,
-		initialSleepDeprivedRate: params.initialSleepDeprivedRate ?? 0,
-		shockTarget: params.shockTarget ?? 'none',
-		intervention: params.intervention ?? 'none',
-		aiDecisionEnabled: params.aiDecisionEnabled === true,
-	};
 }
 
 interface SimulationDashboardProps {
@@ -132,7 +102,7 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 	} = useWatchModeSimulation();
 	// localStorage はサーバーで読めないため、初期値は既定値にしてマウント後に差し替える
 	const [settings, setSettings] = useState<ExperimentSettings>(DEFAULT_EXPERIMENT_SETTINGS);
-	const [form, setForm] = useState<FormState>(() =>
+	const [form, setForm] = useState<SimulationFormState>(() =>
 		replay === undefined ? DEFAULT_FORM : formFromParams(replay.params),
 	);
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -141,19 +111,8 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 	const [saveError, setSaveError] = useState<string | null>(null);
 
 	const buildParams = useCallback(
-		(next: FormState): ExperimentConfigParams => ({
-			// Traffic Level や閾値などフォームに無い条件は、Settings 画面の保存値と
-			// Replay 元の条件から引き継ぐ。これが無いとリセット時に条件が変わってしまう
-			...toExperimentConfigParams(settings),
-			...replay?.params,
-			seed: next.seed,
-			population: next.population,
-			days: next.days,
-			initialSleepDeprivedRate: next.initialSleepDeprivedRate,
-			shockTarget: next.shockTarget,
-			intervention: next.intervention === 'none' ? null : next.intervention,
-			aiDecisionEnabled: next.aiDecisionEnabled,
-		}),
+		(next: SimulationFormState): ExperimentConfigParams =>
+			toRunParams(next, settings, replay?.params),
 		[replay, settings],
 	);
 

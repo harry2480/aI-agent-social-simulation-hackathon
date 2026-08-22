@@ -2,6 +2,7 @@ import type { ExperimentAggregate } from '@/backend/presentation/composition/sim
 import {
 	findCriticalPointRange,
 	parseInitialRateLabel,
+	toCriticalPointChartData,
 	toCriticalPointSeries,
 } from '@/frontend/lib/critical-point-presentation';
 import { describe, expect, it } from 'vitest';
@@ -81,5 +82,41 @@ describe('findCriticalPointRange', () => {
 		]);
 
 		expect(findCriticalPointRange(series)).toBeNull();
+	});
+});
+
+describe('toCriticalPointChartData', () => {
+	it('率を % へ直し、グラフの目盛りに合わせて丸める', () => {
+		const data = toCriticalPointChartData([
+			{
+				initialRate: 0.075,
+				cascadeProbability: 0.3333,
+				averageReach: 12.345,
+				averageRs: 1,
+				standardDeviation: 0,
+				runCount: 10,
+			},
+		]);
+
+		expect(data).toEqual([{ rate: 7.5, probability: 33.3, reach: 12.3 }]);
+	});
+
+	it('渡された順序を保つ。曲線がねじれない', () => {
+		const sample = (initialRate: number) => ({
+			initialRate,
+			cascadeProbability: 0,
+			averageReach: 0,
+			averageRs: 0,
+			standardDeviation: 0,
+			runCount: 1,
+		});
+
+		expect(toCriticalPointChartData([sample(0.01), sample(0.2)]).map((p) => p.rate)).toEqual([
+			1, 20,
+		]);
+	});
+
+	it('Sweep 結果が無ければ空', () => {
+		expect(toCriticalPointChartData([])).toEqual([]);
 	});
 });

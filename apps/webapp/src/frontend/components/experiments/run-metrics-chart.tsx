@@ -1,6 +1,7 @@
 'use client';
 
 import type { MetricsSnapshot } from '@/backend/presentation/composition/simulation.composition';
+import { toRunMetricsSeries } from '@/frontend/lib/run-metrics-presentation';
 import {
 	CartesianGrid,
 	Legend,
@@ -16,9 +17,6 @@ interface RunMetricsChartProps {
 	metrics: readonly MetricsSnapshot[];
 }
 
-/** 1 日 = 96 Tick（15 分 Tick） */
-const TICKS_PER_DAY = 96;
-
 /**
  * Run の KPI 時系列（要件定義 25・36 章）。
  * Sleep-Deprived Population と Rs はスケールが 2 桁以上違うため軸を分ける。
@@ -30,14 +28,7 @@ export function RunMetricsChart({ metrics }: RunMetricsChartProps) {
 		);
 	}
 
-	const data = metrics.map((snapshot) => ({
-		day: Number((snapshot.tick / TICKS_PER_DAY + 1).toFixed(2)),
-		sleepDeprived: snapshot.sleepDeprivedPopulation,
-		severe: snapshot.severeSleepDeprivedPopulation,
-		accidents: snapshot.accidentCount,
-		rs: Number(snapshot.currentRs.toFixed(3)),
-		sleepDebt: Number(snapshot.totalSleepDebtHours.toFixed(1)),
-	}));
+	const data = toRunMetricsSeries(metrics);
 
 	return (
 		<div className="h-72 w-full">

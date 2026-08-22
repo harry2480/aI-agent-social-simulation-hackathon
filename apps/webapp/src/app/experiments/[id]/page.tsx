@@ -8,6 +8,7 @@ import { ExperimentReportCard } from '@/frontend/components/experiments/experime
 import { RunMetricsChart } from '@/frontend/components/experiments/run-metrics-chart';
 import { RunTable } from '@/frontend/components/experiments/run-table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
+import { selectRun } from '@/frontend/lib/simulation-form';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -35,8 +36,7 @@ export default async function ExperimentDetailPage({
 
 	const { run: requestedRunId } = await searchParams;
 	// 指定が無ければ先頭の Run を表示する。Run が無い実験では時系列は出せない
-	const selectedRun =
-		detail.runs.find((candidate) => candidate.id === requestedRunId) ?? detail.runs[0] ?? null;
+	const selectedRun = selectRun(detail.runs, requestedRunId);
 	const metrics = selectedRun === null ? [] : await loadRunMetrics(selectedRun.id);
 
 	return (
