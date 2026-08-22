@@ -1,8 +1,6 @@
-import {
-	type DecisionContext,
-	createDecideAgentActionUseCase,
-} from '@/backend/presentation/composition/decision.composition';
+import { createDecideAgentActionUseCase } from '@/backend/presentation/composition/decision.composition';
 import { NextResponse } from 'next/server';
+import { isDecisionContext } from './request';
 
 /**
  * Watch Mode のブラウザ実行から呼ばれる AI Decision エンドポイント。
@@ -10,21 +8,6 @@ import { NextResponse } from 'next/server';
  * Route Handler 自体はロジックを持たず composition から UseCase を取得して呼ぶだけとする。
  */
 const useCase = createDecideAgentActionUseCase();
-
-function isDecisionContext(value: unknown): value is DecisionContext {
-	if (typeof value !== 'object' || value === null) {
-		return false;
-	}
-	const candidate = value as Partial<DecisionContext>;
-	return (
-		typeof candidate.agent === 'object' &&
-		candidate.agent !== null &&
-		typeof candidate.situation === 'object' &&
-		candidate.situation !== null &&
-		Array.isArray(candidate.actions) &&
-		candidate.actions.length > 0
-	);
-}
 
 export async function POST(request: Request): Promise<NextResponse> {
 	const body: unknown = await request.json();
