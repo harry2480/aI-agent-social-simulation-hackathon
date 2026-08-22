@@ -6,6 +6,7 @@ import type {
 	StoredRun,
 } from '../../domain/repositories/simulation-run.repository';
 import { prisma } from '../db/prisma-client';
+import { chunked, toStoredRun } from './record-mapper';
 
 /** 1 回の createMany へ渡す最大件数。大量 Event でクエリが肥大化するのを防ぐ */
 const BULK_CHUNK_SIZE = 1000;
@@ -49,7 +50,7 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 
 	async findById(runId: string): Promise<StoredRun | null> {
 		const record = await prisma.simulationRun.findUnique({ where: { id: runId } });
-		return record === null ? null : this.toStoredRun(record);
+		return record === null ? null : toStoredRun(record);
 	}
 
 	async findByExperimentId(experimentId: string): Promise<StoredRun[]> {
@@ -57,7 +58,7 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 			where: { experimentId },
 			orderBy: { startedAt: 'asc' },
 		});
-		return records.map((record) => this.toStoredRun(record));
+		return records.map((record) => toStoredRun(record));
 	}
 
 	async findRecent(limit: number): Promise<StoredRun[]> {
@@ -65,7 +66,7 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 			orderBy: { startedAt: 'desc' },
 			take: limit,
 		});
-		return records.map((record) => this.toStoredRun(record));
+		return records.map((record) => toStoredRun(record));
 	}
 
 	private async saveAgents(
@@ -198,34 +199,8 @@ export class PrismaSimulationRunRepository implements SimulationRunRepository {
 		items: readonly T[],
 		write: (chunk: T[]) => Promise<unknown>,
 	): Promise<void> {
-		for (let offset = 0; offset < items.length; offset += BULK_CHUNK_SIZE) {
-			await write(items.slice(offset, offset + BULK_CHUNK_SIZE));
+		for (const chunk of chunked(items, BULK_CHUNK_SIZE)) {
+			await write(chunk);
 		}
-	}
-
-	private toStoredRun(record: {
-		id: string;
-		experimentId: string | null;
-		seed: number;
-		population: number;
-		days: number;
-		intervention: string | null;
-		aiModel: string | null;
-		status: string;
-		configJson: Prisma.JsonValue;
-		summaryJson: Prisma.JsonValue;
-	}): StoredRun {
-		return {
-			id: record.id,
-			experimentId: record.experimentId,
-			seed: record.seed,
-			population: record.population,
-			days: record.days,
-			intervention: record.intervention,
-			aiModel: record.aiModel,
-			status: record.status,
-			config: record.configJson,
-			summary: record.summaryJson === null ? null : (record.summaryJson as unknown as RunSummary),
-		};
 	}
 }

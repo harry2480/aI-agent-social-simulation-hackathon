@@ -5,6 +5,7 @@ import type {
 	StoredExperiment,
 } from '../../domain/repositories/experiment.repository';
 import { prisma } from '../db/prisma-client';
+import { toStoredExperiment } from './record-mapper';
 
 export class PrismaExperimentRepository implements ExperimentRepository {
 	async create(params: { name: string; kind: string; config: unknown }): Promise<string> {
@@ -43,7 +44,7 @@ export class PrismaExperimentRepository implements ExperimentRepository {
 			where: { id: experimentId },
 			include: { results: true },
 		});
-		return record === null ? null : this.toStored(record);
+		return record === null ? null : toStoredExperiment(record);
 	}
 
 	async findRecent(limit: number): Promise<StoredExperiment[]> {
@@ -52,42 +53,6 @@ export class PrismaExperimentRepository implements ExperimentRepository {
 			take: limit,
 			include: { results: true },
 		});
-		return records.map((record) => this.toStored(record));
-	}
-
-	private toStored(record: {
-		id: string;
-		name: string;
-		kind: string;
-		configJson: Prisma.JsonValue;
-		results: {
-			label: string;
-			runCount: number;
-			cascadeProbability: number;
-			averageRs: number;
-			peakRs: number;
-			averageReach: number;
-			totalSleepLossMinutes: number;
-			standardDeviation: number;
-			aggregateJson: Prisma.JsonValue;
-		}[];
-	}): StoredExperiment {
-		return {
-			id: record.id,
-			name: record.name,
-			kind: record.kind,
-			config: record.configJson,
-			results: record.results.map((result) => ({
-				label: result.label,
-				runCount: result.runCount,
-				cascadeProbability: result.cascadeProbability,
-				averageRs: result.averageRs,
-				peakRs: result.peakRs,
-				averageReach: result.averageReach,
-				totalSleepLossMinutes: result.totalSleepLossMinutes,
-				standardDeviation: result.standardDeviation,
-				aggregate: result.aggregateJson,
-			})),
-		};
+		return records.map((record) => toStoredExperiment(record));
 	}
 }
