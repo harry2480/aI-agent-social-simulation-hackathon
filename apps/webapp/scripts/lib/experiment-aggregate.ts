@@ -23,9 +23,13 @@ export interface Aggregate {
 	standardDeviation: number;
 }
 
-/** `--name=value` 形式の引数を読む */
+/**
+ * `--name=value` 形式の引数を読む。
+ * 値に `=` が含まれても切り詰めないよう、分割ではなく接頭辞の長さで切る。
+ */
 export function argValue(argv: readonly string[], name: string): string | undefined {
-	return argv.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
+	const prefix = `--${name}=`;
+	return argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
 }
 
 /**

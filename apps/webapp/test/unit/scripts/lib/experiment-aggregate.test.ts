@@ -45,6 +45,13 @@ describe('argValue', () => {
 		expect(argValue(['--seeds-per-run=3', '--seeds=10'], 'seeds')).toBe('10');
 	});
 
+	it('値に = が含まれても切り詰めない', () => {
+		// モデル ID のように値の中へ = が入りうる。先頭の = で切ると
+		// 別のモデルを指したまま実験結果が DB へ保存される
+		expect(argValue(['--models=vendor=model'], 'models')).toBe('vendor=model');
+		expect(argValue(['--kind=a=b=c'], 'kind')).toBe('a=b=c');
+	});
+
 	it('値が空でも undefined ではなく空文字を返す', () => {
 		// --models= の指定漏れは呼び出し側で「モデル 0 件」として弾く
 		expect(argValue(['--models='], 'models')).toBe('');
