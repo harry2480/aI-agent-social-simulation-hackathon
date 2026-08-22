@@ -45,9 +45,19 @@ describe('ProbabilisticEventService.accidentProbability', () => {
 	});
 
 	it('上限 0.4 でクリップされる', () => {
+		// trafficLevel は ExperimentConfig で範囲検証されておらず、API やスクリプトから
+		// 任意の値が入りうる。上限が無いと事故率が 1 に張り付き Simulation が成立しない
 		const worst = createTestAgent({ fatigue: 100, stress: 100, riskTolerance: 1 });
 
 		expect(service.accidentProbability(worst, 100)).toBe(0.4);
+	});
+
+	it('上限に達するのは交通量が極端な場合だけ', () => {
+		// Fatigue / Stress / リスク許容度を振り切っても、標準的な交通量では上限に届かない
+		const worst = createTestAgent({ fatigue: 100, stress: 100, riskTolerance: 1 });
+
+		expect(service.accidentProbability(worst, 3)).toBeLessThan(0.4);
+		expect(service.accidentProbability(worst, 12)).toBe(0.4);
 	});
 });
 
@@ -63,13 +73,12 @@ describe('ProbabilisticEventService.workFailureProbability', () => {
 	});
 
 	it('最悪条件でも 3% 程度にとどまる', () => {
-		// Fatigue / Stress は Agent 側で 0〜100 にクランプされるため、
-		// workFailureProbability は実装にある上限 0.4 へ到達しない。
-		// 事故と違って作業ミスは「たまに起きる」程度に収める設計であることを固定しておく
+		// Fatigue / Stress は Agent 側で 0〜100 にクランプされ、事故と違って
+		// 外から入る係数も無いため、上限で頭を押さえる必要がない。
+		// 作業ミスは「たまに起きる」程度に収める設計であることを固定しておく
 		const worst = service.workFailureProbability(createTestAgent({ fatigue: 100, stress: 100 }));
 
 		expect(worst).toBeCloseTo(0.03, 10);
-		expect(worst).toBeLessThan(0.4);
 	});
 
 	it('リスク許容度は作業ミスに影響しない', () => {
