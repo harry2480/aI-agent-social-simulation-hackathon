@@ -25,9 +25,9 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9",
-		"knip": "^6.32.1",
+		"knip": "^6.32.2",
 		"simple-git-hooks": "^2.13.1",
-		"supabase": "^2.81.3",
+		"supabase": "^2.115.0",
 		"vercel": "^50.33.1"
 	},
 	"pnpm": {
