@@ -258,8 +258,11 @@ export function transmissionArrows(
 	return arrows;
 }
 
-/** 集約表示へ切り替えるズーム倍率の上限。これ以上寄せれば常に 1 人ずつ描く */
-export const AGGREGATION_MAX_ZOOM = 1.5;
+/**
+ * 1 人ずつ描き始めるズーム倍率。ここまで寄せれば人数によらず個別描画にする。
+ * ＋ ボタン 1 回（ZOOM_STEP）でちょうど到達し、集約から個別へ切り替わる。
+ */
+export const INDIVIDUAL_RENDERING_MIN_ZOOM = 1.5;
 /**
  * 1 地区あたりの人数がこれを超えると、低ズームでは円が重なって状態を数えられない。
  *
@@ -275,7 +278,7 @@ export function shouldAggregateAgents(
 	districtCount: number,
 	zoom: number,
 ): boolean {
-	if (districtCount === 0 || zoom > AGGREGATION_MAX_ZOOM) {
+	if (districtCount === 0 || zoom >= INDIVIDUAL_RENDERING_MIN_ZOOM) {
 		return false;
 	}
 	return agentCount / districtCount > AGGREGATION_AGENTS_PER_DISTRICT;

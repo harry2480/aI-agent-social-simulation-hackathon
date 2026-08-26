@@ -194,6 +194,8 @@ export function CityMap({
 	const agentPositionsRef = useRef<AgentPosition[]>([]);
 	const clustersRef = useRef<DistrictCluster[]>([]);
 	const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+	/** 直前の操作がドラッグだったか。ドラッグ終わりの click を選択に使わないための目印 */
+	const draggedRef = useRef(false);
 	const [viewport, setViewport] = useState<MapViewport>(DEFAULT_VIEWPORT);
 
 	/** 画面中央を保ったまま倍率だけを変える。ボタン操作用 */
@@ -354,7 +356,9 @@ export function CityMap({
 	// Canvas は再レイアウトで自動的に描き直されず、前の解像度の絵が引き伸ばされたままになる。
 	// 監視の張り直しを避けるため、最新の描画関数は ref 経由で呼ぶ
 	const drawRef = useRef(draw);
-	drawRef.current = draw;
+	useEffect(() => {
+		drawRef.current = draw;
+	}, [draw]);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -416,7 +420,8 @@ export function CityMap({
 					}}
 					onPointerMove={(event) => {
 						const drag = dragRef.current;
-						if (drag === null) {
+						// ボタンを離した後の hover でも pointermove は届くため、押下中だけ動かす
+						if (drag === null || event.buttons === 0) {
 							return;
 						}
 						const deltaX = event.clientX - drag.x;
@@ -440,6 +445,13 @@ export function CityMap({
 					}}
 					onPointerUp={(event) => {
 						event.currentTarget.releasePointerCapture(event.pointerId);
+						draggedRef.current = dragRef.current?.moved === true;
+						dragRef.current = null;
+					}}
+					onPointerCancel={() => {
+						// タッチのキャンセル等で pointerup / click が来ない場合に掴んだままにしない
+						dragRef.current = null;
+						draggedRef.current = false;
 					}}
 					onKeyDown={(event) => {
 						// クリック選択のキーボード等価操作。左右キーで Agent を順に選択する
@@ -454,8 +466,8 @@ export function CityMap({
 					}}
 					onClick={(event) => {
 						// ドラッグ後の click は移動の終わりなので選択に使わない
-						const dragged = dragRef.current?.moved === true;
-						dragRef.current = null;
+						const dragged = draggedRef.current;
+						draggedRef.current = false;
 						const canvas = canvasRef.current;
 						if (dragged || canvas === null) {
 							return;

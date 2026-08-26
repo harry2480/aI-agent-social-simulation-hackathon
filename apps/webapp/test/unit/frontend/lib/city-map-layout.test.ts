@@ -1,7 +1,7 @@
 import {
 	AGENT_HIT_RADIUS,
-	AGGREGATION_MAX_ZOOM,
 	DEFAULT_VIEWPORT,
+	INDIVIDUAL_RENDERING_MIN_ZOOM,
 	MAX_ZOOM,
 	MIN_ZOOM,
 	WORLD_SIZE,
@@ -298,7 +298,9 @@ describe('shouldAggregateAgents', () => {
 	});
 
 	it('寄せれば人数によらず個別描画へ戻す', () => {
-		expect(shouldAggregateAgents(500, 7, AGGREGATION_MAX_ZOOM + 0.1)).toBe(false);
+		// ＋ ボタン 1 回でちょうど個別描画へ切り替わる境界
+		expect(shouldAggregateAgents(500, 7, INDIVIDUAL_RENDERING_MIN_ZOOM)).toBe(false);
+		expect(shouldAggregateAgents(500, 7, INDIVIDUAL_RENDERING_MIN_ZOOM - 0.1)).toBe(true);
 	});
 
 	it('地区が無ければ集約しない', () => {
