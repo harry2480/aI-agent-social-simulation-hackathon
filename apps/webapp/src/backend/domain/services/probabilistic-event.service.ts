@@ -2,15 +2,6 @@ import type { Agent } from '../models/agent.model';
 import type { SeededRandomService } from './seeded-random.service';
 
 /**
- * 1 Tick あたりの事故発生確率の上限。
- *
- * trafficLevel は ExperimentConfig で範囲検証されておらず、API やスクリプトから
- * 任意の値が入りうる。交通量に比例する事故率が 1 に張り付くと、運転する Agent が
- * 毎 Tick 事故を起こして Simulation が成立しなくなるため、ここで頭を押さえる。
- */
-const MAX_ACCIDENT_PROBABILITY_PER_TICK = 0.4;
-
-/**
  * 事故・作業ミスの確率算出。AI ではなく Simulation Engine が決定する（要件定義 19 章）。
  *
  * Event Probability = Base × Fatigue × Stress × Environment × Action
@@ -36,15 +27,19 @@ export class ProbabilisticEventService {
 		return this.rng.bool(this.workFailureProbability(agent));
 	}
 
+	/**
+	 * 事故の発生確率。
+	 * trafficLevel は ExperimentConfig が 3 以下へ検証するため、最悪条件でも
+	 * 0.0015 × 6 × 2.5 × 3 × 1.6 = 約 11% にとどまる。上限で頭を押さえる必要はない。
+	 */
 	accidentProbability(agent: Agent, trafficLevel: number): number {
 		const base = 0.0015;
-		return Math.min(
-			MAX_ACCIDENT_PROBABILITY_PER_TICK,
+		return (
 			base *
-				this.fatigueMultiplier(agent) *
-				this.stressMultiplier(agent) *
-				Math.max(0.1, trafficLevel) *
-				this.riskToleranceMultiplier(agent),
+			this.fatigueMultiplier(agent) *
+			this.stressMultiplier(agent) *
+			Math.max(0.1, trafficLevel) *
+			this.riskToleranceMultiplier(agent)
 		);
 	}
 

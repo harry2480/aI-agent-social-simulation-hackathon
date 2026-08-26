@@ -1,3 +1,4 @@
+import { MAX_TRAFFIC_LEVEL } from '@/backend/domain/models/experiment-config.model';
 import { ProbabilisticEventService } from '@/backend/domain/services/probabilistic-event.service';
 import { SeededRandomService } from '@/backend/domain/services/seeded-random.service';
 import { describe, expect, it } from 'vitest';
@@ -44,20 +45,17 @@ describe('ProbabilisticEventService.accidentProbability', () => {
 		expect(service.accidentProbability(agent, 0)).toBe(service.accidentProbability(agent, 0.1));
 	});
 
-	it('上限 0.4 でクリップされる', () => {
-		// trafficLevel は ExperimentConfig で範囲検証されておらず、API やスクリプトから
-		// 任意の値が入りうる。上限が無いと事故率が 1 に張り付き Simulation が成立しない
+	it('許容される最大の交通量でも 11% 程度にとどまる', () => {
+		// trafficLevel は ExperimentConfig が 3 以下へ検証するため、
+		// Fatigue / Stress / リスク許容度を振り切っても事故率は張り付かない。
+		// 上限でクリップしなくても Simulation が成立することを固定しておく
 		const worst = createTestAgent({ fatigue: 100, stress: 100, riskTolerance: 1 });
 
-		expect(service.accidentProbability(worst, 100)).toBe(0.4);
-	});
-
-	it('上限に達するのは交通量が極端な場合だけ', () => {
-		// Fatigue / Stress / リスク許容度を振り切っても、標準的な交通量では上限に届かない
-		const worst = createTestAgent({ fatigue: 100, stress: 100, riskTolerance: 1 });
-
-		expect(service.accidentProbability(worst, 3)).toBeLessThan(0.4);
-		expect(service.accidentProbability(worst, 12)).toBe(0.4);
+		expect(service.accidentProbability(worst, MAX_TRAFFIC_LEVEL)).toBeCloseTo(
+			0.0015 * 6 * 2.5 * 3 * 1.6,
+			10,
+		);
+		expect(service.accidentProbability(worst, MAX_TRAFFIC_LEVEL)).toBeLessThan(0.12);
 	});
 });
 
