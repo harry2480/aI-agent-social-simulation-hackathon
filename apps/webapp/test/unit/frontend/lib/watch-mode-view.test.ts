@@ -5,6 +5,7 @@ import { SimulationState } from '@/backend/domain/models/simulation-state.model'
 import { SeededRandomService } from '@/backend/domain/services/seeded-random.service';
 import {
 	BASE_TICK_INTERVAL_MS,
+	MAP_HIGHLIGHT_TICKS,
 	TIMELINE_LIMIT,
 	tickIntervalMs,
 	toWatchModeView,
@@ -123,5 +124,100 @@ describe('toWatchModeView', () => {
 
 		expect(toWatchModeView(state, true).finished).toBe(true);
 		expect(toWatchModeView(state, false).finished).toBe(false);
+	});
+});
+
+describe('toWatchModeView の City Map 表示', () => {
+	it('直近に事故を起こした Agent を渡す', () => {
+		const state = buildState();
+		state.clock = SimulationClock.fromTick(10);
+		state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 10,
+				type: 'accident',
+				actorId: 'agent-0001',
+			}),
+		);
+
+		expect(toWatchModeView(state, false).accidentAgentIds).toEqual(['agent-0001']);
+	});
+
+	it('古い事故は残さない', () => {
+		// 出しっぱなしにすると事故が起きていない時間帯まで赤くなる
+		const state = buildState();
+		state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 0,
+				type: 'accident',
+				actorId: 'agent-0001',
+			}),
+		);
+		state.clock = SimulationClock.fromTick(MAP_HIGHLIGHT_TICKS + 1);
+
+		expect(toWatchModeView(state, false).accidentAgentIds).toEqual([]);
+	});
+
+	it('同じ Agent が同じ窓の中で複数回事故を起こしても 1 件にまとめる', () => {
+		const state = buildState();
+		for (const tick of [0, 1]) {
+			state.recordEvent(
+				SimulationEvent.create({
+					id: state.nextEventId(),
+					tick,
+					type: 'accident',
+					actorId: 'agent-0001',
+				}),
+			);
+		}
+		state.clock = SimulationClock.fromTick(1);
+
+		expect(toWatchModeView(state, false).accidentAgentIds).toEqual(['agent-0001']);
+	});
+
+	it('事故以外の Event は事故として渡さない', () => {
+		const state = buildState();
+		state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 0,
+				type: 'overtime',
+				actorId: 'agent-0001',
+			}),
+		);
+
+		expect(toWatchModeView(state, false).accidentAgentIds).toEqual([]);
+	});
+
+	it('直近の Sleep Transmission を伝播元・伝播先の組で渡す', () => {
+		const state = buildState();
+		state.transmissions.push({
+			fromAgentId: 'agent-0001',
+			toAgentId: 'agent-0002',
+			tick: 0,
+			sleepLossMinutes: 45,
+			causeEventId: 'e1',
+			becameNewCase: false,
+		});
+
+		expect(toWatchModeView(state, false).transmissions).toEqual([
+			{ fromAgentId: 'agent-0001', toAgentId: 'agent-0002' },
+		]);
+	});
+
+	it('古い Sleep Transmission は残さない', () => {
+		const state = buildState();
+		state.transmissions.push({
+			fromAgentId: 'agent-0001',
+			toAgentId: 'agent-0002',
+			tick: 0,
+			sleepLossMinutes: 45,
+			causeEventId: 'e1',
+			becameNewCase: false,
+		});
+		state.clock = SimulationClock.fromTick(MAP_HIGHLIGHT_TICKS + 1);
+
+		expect(toWatchModeView(state, false).transmissions).toEqual([]);
 	});
 });
