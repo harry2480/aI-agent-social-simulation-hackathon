@@ -2,6 +2,7 @@ import {
 	MAX_SYNCHRONOUS_AGENT_TICKS,
 	exceedsSynchronousLimit,
 	isCreateSimulationInput,
+	parseRunDetailLevel,
 } from '@/app/api/simulations/request';
 import { TICKS_PER_DAY } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { describe, expect, it } from 'vitest';
@@ -60,5 +61,23 @@ describe('exceedsSynchronousLimit', () => {
 
 	it('小さな Run は通す', () => {
 		expect(exceedsSynchronousLimit({ population: 10, days: 1 })).toBe(false);
+	});
+});
+
+describe('parseRunDetailLevel', () => {
+	it('指定が無ければ summary', () => {
+		expect(parseRunDetailLevel(null)).toBe('summary');
+	});
+
+	it('summary / full をそのまま返す', () => {
+		expect(parseRunDetailLevel('summary')).toBe('summary');
+		expect(parseRunDetailLevel('full')).toBe('full');
+	});
+
+	it('解釈できない値は既定へ倒さず null を返す', () => {
+		// ?detail=all のような綴り違いが黙って summary になると気付けないため
+		for (const raw of ['all', 'FULL', '', 'detail']) {
+			expect(parseRunDetailLevel(raw)).toBeNull();
+		}
 	});
 });

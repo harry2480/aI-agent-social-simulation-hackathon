@@ -34,3 +34,19 @@ export function exceedsSynchronousLimit(input: {
 }): boolean {
 	return input.population * input.days * TICKS_PER_DAY > MAX_SYNCHRONOUS_AGENT_TICKS;
 }
+
+export type RunDetailLevel = 'summary' | 'full';
+
+/**
+ * Run 取得の粒度を解釈する。指定が無ければ `summary`。
+ *
+ * `full` は Agent / Event / Causal Edge / Decision / Metrics まで返すが、
+ * 500 Agent × 14 日の Run では Event が 10 万件規模になりレスポンスが肥大するため、
+ * 明示されたときだけ返す。解釈できない値は既定へ倒さず呼び出し側へ知らせる（null）。
+ */
+export function parseRunDetailLevel(raw: string | null): RunDetailLevel | null {
+	if (raw === null) {
+		return 'summary';
+	}
+	return raw === 'summary' || raw === 'full' ? raw : null;
+}
