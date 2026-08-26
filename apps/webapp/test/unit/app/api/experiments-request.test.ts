@@ -1,4 +1,5 @@
-import { EXPERIMENT_KINDS, isCreateExperimentInput } from '@/app/api/experiments/request';
+import { isCreateExperimentInput } from '@/app/api/experiments/request';
+import { EXPERIMENT_KINDS } from '@/backend/domain/models/experiment-kind.model';
 import { describe, expect, it } from 'vitest';
 
 const VALID = {

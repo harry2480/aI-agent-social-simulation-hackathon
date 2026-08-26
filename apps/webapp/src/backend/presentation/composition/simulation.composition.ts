@@ -51,6 +51,8 @@ export type {
 	StoredExperiment,
 	ExperimentAggregate,
 } from '../../domain/repositories/experiment.repository';
+export type { ExperimentKind } from '../../domain/models/experiment-kind.model';
+export { EXPERIMENT_KINDS, isExperimentKind } from '../../domain/models/experiment-kind.model';
 export type {
 	AgentSnapshot,
 	CausalEdgeSnapshot,

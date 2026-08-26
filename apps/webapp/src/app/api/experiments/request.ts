@@ -1,19 +1,11 @@
 import type { CreateExperimentInput } from '@/backend/presentation/actions/experiment.action';
-
-/**
- * 画面とスクリプトが読む実験の種別。
- * ここに無い kind で登録するとどの画面からも参照できない行になるため、登録時に弾く。
- */
-export const EXPERIMENT_KINDS = [
-	'shock-comparison',
-	'critical-point',
-	'intervention',
-	'super-spreader',
-	'ai-model-comparison',
-] as const;
+import { isExperimentKind } from '@/backend/presentation/composition/simulation.composition';
 
 /**
  * 実験登録リクエストの形を確認する。
+ *
+ * kind は画面が読む種別（`EXPERIMENT_KINDS`）に限る。
+ * それ以外で登録すると、どの画面からも参照されない実験行が残るため。
  * config は実験ごとに形が異なるスナップショットなので、存在だけを見て中身は検証しない。
  */
 export function isCreateExperimentInput(value: unknown): value is CreateExperimentInput {
@@ -24,8 +16,7 @@ export function isCreateExperimentInput(value: unknown): value is CreateExperime
 	return (
 		typeof candidate.name === 'string' &&
 		candidate.name.length > 0 &&
-		typeof candidate.kind === 'string' &&
-		(EXPERIMENT_KINDS as readonly string[]).includes(candidate.kind) &&
+		isExperimentKind(candidate.kind) &&
 		'config' in candidate
 	);
 }
