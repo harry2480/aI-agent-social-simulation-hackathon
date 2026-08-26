@@ -37,6 +37,7 @@ describe('isCreateExperimentInput', () => {
 	});
 
 	it('オブジェクト以外は弾く', () => {
+		// 壊れた JSON は readJsonBody が undefined にして渡すため、ここで 400 になる
 		for (const body of [null, undefined, 'text', 42, true, [VALID]]) {
 			expect(isCreateExperimentInput(body)).toBe(false);
 		}

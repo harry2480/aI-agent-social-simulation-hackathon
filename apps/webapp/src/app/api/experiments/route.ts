@@ -1,6 +1,7 @@
 import { createExperimentAction } from '@/backend/presentation/actions/experiment.action';
 import { isDatabaseConfigured } from '@/backend/presentation/composition/simulation.composition';
 import { NextResponse } from 'next/server';
+import { readJsonBody } from '../json-body';
 import { isCreateExperimentInput } from './request';
 
 /**
@@ -11,7 +12,7 @@ import { isCreateExperimentInput } from './request';
  * ローカルの `scripts/run-experiment.ts` が実行し、結果を `experiment_results` へ保存する。
  */
 export async function POST(request: Request): Promise<NextResponse> {
-	const body: unknown = await request.json();
+	const body = await readJsonBody(request);
 	if (!isCreateExperimentInput(body)) {
 		return NextResponse.json({ error: 'invalid experiment input' }, { status: 400 });
 	}
