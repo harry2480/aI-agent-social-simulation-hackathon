@@ -15,6 +15,7 @@ import {
 	MAX_ZOOM,
 	MIN_ZOOM,
 	type MapViewport,
+	TRANSMISSION_ARROW_HEAD_LENGTH,
 	type TransmissionArrow,
 	ZOOM_STEP,
 	accidentMarkers,
@@ -64,8 +65,6 @@ const CLUSTER_FOCUS_ZOOM = 2;
 const WHEEL_ZOOM_STEP = 1.1;
 /** ドラッグ扱いにする移動量（px）。これ未満はクリックとして選択に使う */
 const DRAG_THRESHOLD_PX = 4;
-/** 伝播矢印の矢先の長さ */
-const ARROW_HEAD_LENGTH = 6;
 
 /** 施設マーカーを形状で描き分ける。色だけに頼らず種別を区別するため */
 function drawFacilityShape(
@@ -112,13 +111,13 @@ function drawTransmissionArrow(context: CanvasRenderingContext2D, arrow: Transmi
 	context.beginPath();
 	context.moveTo(arrow.toX, arrow.toY);
 	context.lineTo(
-		arrow.toX - Math.cos(angle - Math.PI / 6) * ARROW_HEAD_LENGTH,
-		arrow.toY - Math.sin(angle - Math.PI / 6) * ARROW_HEAD_LENGTH,
+		arrow.toX - Math.cos(angle - Math.PI / 6) * TRANSMISSION_ARROW_HEAD_LENGTH,
+		arrow.toY - Math.sin(angle - Math.PI / 6) * TRANSMISSION_ARROW_HEAD_LENGTH,
 	);
 	context.moveTo(arrow.toX, arrow.toY);
 	context.lineTo(
-		arrow.toX - Math.cos(angle + Math.PI / 6) * ARROW_HEAD_LENGTH,
-		arrow.toY - Math.sin(angle + Math.PI / 6) * ARROW_HEAD_LENGTH,
+		arrow.toX - Math.cos(angle + Math.PI / 6) * TRANSMISSION_ARROW_HEAD_LENGTH,
+		arrow.toY - Math.sin(angle + Math.PI / 6) * TRANSMISSION_ARROW_HEAD_LENGTH,
 	);
 	context.stroke();
 }

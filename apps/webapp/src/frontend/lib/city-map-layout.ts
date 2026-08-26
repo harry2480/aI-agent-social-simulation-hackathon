@@ -224,10 +224,22 @@ export interface TransmissionArrow {
 	toY: number;
 }
 
+/** 矢先の長さ（キャンバス座標） */
+export const TRANSMISSION_ARROW_HEAD_LENGTH = 6;
+/**
+ * 矢印として描く最短の長さ（キャンバス座標）。
+ *
+ * 同一施設の Agent はスパイラル配置で数 px しか離れないため、
+ * 矢先（TRANSMISSION_ARROW_HEAD_LENGTH）のほうが軸より長くなり、
+ * 向きの読めない塊になる。軸が矢先より短くなる組み合わせは描かない。
+ */
+export const MIN_TRANSMISSION_ARROW_LENGTH = TRANSMISSION_ARROW_HEAD_LENGTH + 2;
+
 /**
  * Sleep Transmission を伝播元 → 伝播先の矢印にする。
  *
- * どちらかが移動中で地図上に居ない場合と、同一施設に居て矢印が点になる場合は描かない。
+ * どちらかが移動中で地図上に居ない場合と、
+ * 2 人が近すぎて矢印が向きの読めない塊になる場合は描かない。
  * 同じ組み合わせが複数回伝播しても矢印は 1 本にまとめる。
  */
 export function transmissionArrows(
@@ -248,7 +260,7 @@ export function transmissionArrows(
 		if (from === undefined || to === undefined) {
 			continue;
 		}
-		if (from.x === to.x && from.y === to.y) {
+		if (Math.hypot(to.x - from.x, to.y - from.y) < MIN_TRANSMISSION_ARROW_LENGTH) {
 			continue;
 		}
 		seen.add(key);

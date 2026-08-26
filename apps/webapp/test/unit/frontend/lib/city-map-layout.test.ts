@@ -243,6 +243,32 @@ describe('transmissionArrows', () => {
 			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-2' }], positions),
 		).toEqual([]);
 	});
+
+	it('同一施設で隣り合う 2 Agent は描かない。矢先より軸が短く塊になるため', () => {
+		const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const sameFacility = agentPositions(
+			[agent('agent-0', 'home-0'), agent('agent-1', 'home-0')],
+			FACILITIES,
+			transform,
+		);
+
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-1' }], sameFacility),
+		).toEqual([]);
+	});
+
+	it('同一施設でも離れて配置された 2 Agent は描く', () => {
+		const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const crowded = agentPositions(
+			Array.from({ length: 30 }, (_, index) => agent(`agent-${index}`, 'home-0')),
+			FACILITIES,
+			transform,
+		);
+
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-29' }], crowded),
+		).toHaveLength(1);
+	});
 });
 
 describe('createCanvasTransform（ズーム・パン）', () => {
