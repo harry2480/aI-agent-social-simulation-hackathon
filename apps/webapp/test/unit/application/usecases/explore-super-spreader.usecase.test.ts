@@ -1,4 +1,9 @@
 import { ExploreSuperSpreaderUseCase } from '@/backend/application/usecases/explore-super-spreader.usecase';
+import type {
+	AiDecisionGateway,
+	DecisionContext,
+	DecisionResult,
+} from '@/backend/domain/gateways/ai-decision.gateway';
 import { SimulationEngine } from '@/backend/domain/services/simulation-engine.service';
 import { RuleBasedAiDecisionGateway } from '@/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +26,17 @@ function useCase() {
 		new RuleBasedAiDecisionGateway(),
 		new RuleBasedAiDecisionGateway(),
 	);
+}
+
+/** どちらの Gateway が呼ばれたかを数える。判断内容は Rule-based と同じにする */
+class RecordingGateway implements AiDecisionGateway {
+	calls = 0;
+	private readonly inner = new RuleBasedAiDecisionGateway();
+
+	async decide(context: DecisionContext): Promise<DecisionResult> {
+		this.calls += 1;
+		return this.inner.decide(context);
+	}
 }
 
 describe('ExperimentConfig の Patient Zero 指定', () => {
@@ -153,5 +169,30 @@ describe('ExploreSuperSpreaderUseCase', () => {
 			first.stage1.map((score) => score.agentId),
 		);
 		expect(second.stage2).toEqual(first.stage2);
+	});
+});
+
+describe('ExploreSuperSpreaderUseCase の Gateway 使い分け', () => {
+	it('Stage 1 は Rule-based、Stage 2 は AI Decision の Gateway を使う（要件定義 31 章）', async () => {
+		const ruleBased = new RecordingGateway();
+		const ai = new RecordingGateway();
+		let aiCallsAfterStage1 = -1;
+
+		await new ExploreSuperSpreaderUseCase(ruleBased, ai).execute({
+			baseConfig: baseConfig(),
+			stage1AgentLimit: 3,
+			stage2TopN: 1,
+			stage2Seeds: [1],
+			onProgress: ({ stage, done, total }) => {
+				if (stage === 1 && done === total) {
+					aiCallsAfterStage1 = ai.calls;
+				}
+			},
+		});
+
+		// 全 Agent を回す Stage 1 で AI を呼ぶと現実的な時間で終わらない
+		expect(aiCallsAfterStage1).toBe(0);
+		expect(ruleBased.calls).toBeGreaterThan(0);
+		expect(ai.calls).toBeGreaterThan(0);
 	});
 });

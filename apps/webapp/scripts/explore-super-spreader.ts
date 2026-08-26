@@ -8,12 +8,19 @@
  *   pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
  *   pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts --population=300 --days=7 --top=10
  *
+ * Stage 1 は Rule-based、Stage 2 は AI Decision で再評価する（要件定義 31 章）。
+ * OPENROUTER_API_KEY が未設定の場合、Stage 2 も Rule-based へ縮退する。
+ *
  * DATABASE_URL が設定されていれば Stage 2 のランキングを Experiment として保存し、
  * `/super-spreader` から参照できるようにする。未設定なら標準出力のみ。
  */
 import { ExploreSuperSpreaderUseCase } from '../src/backend/application/usecases/explore-super-spreader.usecase';
 import { ExperimentConfig } from '../src/backend/domain/models/experiment-config.model';
-import { RuleBasedAiDecisionGateway } from '../src/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
+import {
+	createDecideAgentActionUseCase,
+	createRuleBasedDecisionGateway,
+	resolveAiModelName,
+} from '../src/backend/presentation/composition/decision.composition';
 import { argValue } from './lib/experiment-aggregate';
 
 /** Stage 2 で使う Seed 群。保存する config と実行条件を一致させるため 1 箇所に置く */
@@ -42,19 +49,24 @@ async function main(): Promise<void> {
 		throw new Error(`invalid config: ${configResult.error}`);
 	}
 
-	// Stage 2 も Rule-based で回す。OpenRouter を使う場合はここを差し替える
+	// Stage 1 は全 Agent を回すため Rule-based 固定。
+	// Stage 2 は上位 Agent だけなので AI Decision を通す（Cache と Fallback は UseCase 側が持つ）
+	const stage2AiModel = resolveAiModelName();
 	const useCase = new ExploreSuperSpreaderUseCase(
-		new RuleBasedAiDecisionGateway(),
-		new RuleBasedAiDecisionGateway(),
+		createRuleBasedDecisionGateway(),
+		createDecideAgentActionUseCase(),
 	);
 
-	console.log(`[super-spreader] population=${population} days=${days} top=${topN}`);
+	console.log(
+		`[super-spreader] population=${population} days=${days} top=${topN} stage2Model=${stage2AiModel}`,
+	);
 	const startedAt = Date.now();
 	const result = await useCase.execute({
 		baseConfig: configResult.value,
 		stage1AgentLimit: Number.isFinite(limit) ? limit : undefined,
 		stage2TopN: topN,
 		stage2Seeds: STAGE2_SEEDS,
+		stage2AiModel,
 		onProgress: ({ stage, done, total }) => {
 			if (done % 25 === 0 || done === total) {
 				console.log(`  stage${stage}: ${done}/${total}`);
@@ -115,7 +127,7 @@ async function main(): Promise<void> {
 	const experimentId = await experimentRepository.create({
 		name: `super-spreader (population ${population} / ${days} days)`,
 		kind: 'super-spreader',
-		config: { population, days, topN, stage2Seeds: STAGE2_SEEDS },
+		config: { population, days, topN, stage2Seeds: STAGE2_SEEDS, stage2AiModel },
 	});
 	// ランキング 1 行を 1 結果として保存する。順位は配列の並びで保持される
 	await experimentRepository.saveResults(
