@@ -50,15 +50,16 @@ async function main(): Promise<void> {
 	}
 
 	// Stage 1 は全 Agent を回すため Rule-based 固定。
-	// Stage 2 は上位 Agent だけなので AI Decision を通す（Cache と Fallback は UseCase 側が持つ）
-	const stage2AiModel = resolveAiModelName();
+	// Stage 2 は上位 Agent だけなので AI Decision を通す（Cache と Fallback は UseCase 側が持つ）。
+	// OPENROUTER_API_KEY が無いときは 'rule-based' が返り、実際にもそれで回る
+	const stage2Model = resolveAiModelName();
 	const useCase = new ExploreSuperSpreaderUseCase(
 		createRuleBasedDecisionGateway(),
 		createDecideAgentActionUseCase(),
 	);
 
 	console.log(
-		`[super-spreader] population=${population} days=${days} top=${topN} stage2Model=${stage2AiModel}`,
+		`[super-spreader] population=${population} days=${days} top=${topN} stage2Model=${stage2Model}`,
 	);
 	const startedAt = Date.now();
 	const result = await useCase.execute({
@@ -66,7 +67,6 @@ async function main(): Promise<void> {
 		stage1AgentLimit: Number.isFinite(limit) ? limit : undefined,
 		stage2TopN: topN,
 		stage2Seeds: STAGE2_SEEDS,
-		stage2AiModel,
 		onProgress: ({ stage, done, total }) => {
 			if (done % 25 === 0 || done === total) {
 				console.log(`  stage${stage}: ${done}/${total}`);
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
 	const experimentId = await experimentRepository.create({
 		name: `super-spreader (population ${population} / ${days} days)`,
 		kind: 'super-spreader',
-		config: { population, days, topN, stage2Seeds: STAGE2_SEEDS, stage2AiModel },
+		config: { population, days, topN, stage2Seeds: STAGE2_SEEDS, stage2Model },
 	});
 	// ランキング 1 行を 1 結果として保存する。順位は配列の並びで保持される
 	await experimentRepository.saveResults(

@@ -40,11 +40,6 @@ export interface ExploreSuperSpreaderParams {
 	stage2TopN?: number;
 	/** Stage 2 で使う Seed 群 */
 	stage2Seeds?: readonly number[];
-	/**
-	 * Stage 2 で使う AI Model 名。Run の条件として記録するためだけに使い、
-	 * 実際にどの Gateway を呼ぶかはコンストラクタで注入されたものが決める。
-	 */
-	stage2AiModel?: string;
 	onProgress?: (progress: { stage: 1 | 2; done: number; total: number }) => void;
 }
 
@@ -78,7 +73,6 @@ export class ExploreSuperSpreaderUseCase {
 					params.baseConfig,
 					[params.baseConfig.seed],
 					this.ruleBasedGateway,
-					{ aiDecisionEnabled: false },
 				),
 			);
 			params.onProgress?.({ stage: 1, done: index + 1, total: candidates.length });
@@ -91,12 +85,7 @@ export class ExploreSuperSpreaderUseCase {
 
 		const stage2: SuperSpreaderScore[] = [];
 		for (const [index, finalist] of finalists.entries()) {
-			stage2.push(
-				await this.evaluate(finalist.agentId, params.baseConfig, seeds, this.aiGateway, {
-					aiDecisionEnabled: true,
-					aiModel: params.stage2AiModel,
-				}),
-			);
+			stage2.push(await this.evaluate(finalist.agentId, params.baseConfig, seeds, this.aiGateway));
 			params.onProgress?.({ stage: 2, done: index + 1, total: finalists.length });
 		}
 		stage2.sort(compareScore);
@@ -121,7 +110,6 @@ export class ExploreSuperSpreaderUseCase {
 		baseConfig: ExperimentConfig,
 		seeds: readonly number[],
 		gateway: AiDecisionGateway,
-		decision: { aiDecisionEnabled: boolean; aiModel?: string },
 	): Promise<SuperSpreaderScore> {
 		let role: AgentRole = 'office_worker';
 		let attributableReach = 0;
@@ -134,11 +122,7 @@ export class ExploreSuperSpreaderUseCase {
 		const networks = new Set<NetworkName>();
 
 		for (const seed of seeds) {
-			const configResult = this.withPatientZero(baseConfig, agentId).withOverrides({
-				seed,
-				aiDecisionEnabled: decision.aiDecisionEnabled,
-				aiModel: decision.aiModel,
-			});
+			const configResult = this.withPatientZero(baseConfig, agentId).withOverrides({ seed });
 			if (!configResult.success) {
 				throw new Error(`ExploreSuperSpreaderUseCase: invalid config (${configResult.error})`);
 			}
