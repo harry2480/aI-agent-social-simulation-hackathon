@@ -45,11 +45,8 @@ export async function loadRunForReplay(runId: string): Promise<StoredRun | null>
  * 保存済み Run の詳細を読む。Decision は直近 200 件までに絞る
  * （1 Run で Population × Days のオーダーになり、全件読むと画面が持たないため）。
  *
- * Watch Mode は実行中の State を直接見るため画面からは使わないが、
- * Agent / Event / Causal Edge / Decision の読み取り経路として意図的に残している
- * （docs/tasks の「設計からの差分」を参照）。
- *
- * @public
+ * Watch Mode は実行中の State を直接見るため画面からは使わない。
+ * `GET /api/simulations/:id?detail=full` からの読み取り経路として使う。
  */
 export async function loadRunDetail(runId: string): Promise<RunDetail | null> {
 	if (!isDatabaseConfigured()) {

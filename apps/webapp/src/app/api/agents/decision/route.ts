@@ -1,5 +1,6 @@
 import { createDecideAgentActionUseCase } from '@/backend/presentation/composition/decision.composition';
 import { NextResponse } from 'next/server';
+import { readJsonBody } from '../../json-body';
 import { isDecisionContext } from './request';
 
 /**
@@ -10,7 +11,7 @@ import { isDecisionContext } from './request';
 const useCase = createDecideAgentActionUseCase();
 
 export async function POST(request: Request): Promise<NextResponse> {
-	const body: unknown = await request.json();
+	const body = await readJsonBody(request);
 	if (!isDecisionContext(body)) {
 		return NextResponse.json({ error: 'invalid decision context' }, { status: 400 });
 	}

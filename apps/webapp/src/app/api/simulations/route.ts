@@ -1,6 +1,7 @@
 import { runSimulationAction } from '@/backend/presentation/actions/simulation.action';
 import { loadRecentRuns } from '@/backend/presentation/loaders/simulation.loader';
 import { NextResponse } from 'next/server';
+import { readJsonBody } from '../json-body';
 import { exceedsSynchronousLimit, isCreateSimulationInput } from './request';
 
 /**
@@ -15,7 +16,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-	const body: unknown = await request.json();
+	const body = await readJsonBody(request);
 	if (!isCreateSimulationInput(body)) {
 		return NextResponse.json({ error: 'invalid simulation input' }, { status: 400 });
 	}
