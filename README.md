@@ -93,7 +93,7 @@ Vercel Function の実行時間上限に当たるため、重いバッチはス�
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=shock-comparison --seeds=10
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=critical-point --seeds=10
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
-pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts
+pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts   # Stage 2 は OPENROUTER_API_KEY があれば AI Decision で再評価する
 
 # 同一 Seed・同一条件のままモデルだけを変えて比較する（要 OPENROUTER_API_KEY）
 pnpm --filter webapp exec tsx scripts/compare-ai-models.ts --models=<model-id>,<model-id> --seeds=3
