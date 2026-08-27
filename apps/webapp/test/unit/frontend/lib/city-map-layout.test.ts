@@ -1,10 +1,22 @@
 import {
 	AGENT_HIT_RADIUS,
+	DEFAULT_VIEWPORT,
+	INDIVIDUAL_RENDERING_MIN_ZOOM,
+	MAX_ZOOM,
+	MIN_ZOOM,
 	WORLD_SIZE,
+	accidentMarkers,
 	agentPositions,
+	clampViewport,
+	clusterAt,
+	clusterRadius,
 	createCanvasTransform,
+	districtClusters,
+	facilityMarkers,
 	nearestAgentWithin,
 	nextAgentId,
+	shouldAggregateAgents,
+	transmissionArrows,
 } from '@/frontend/lib/city-map-layout';
 import { describe, expect, it } from 'vitest';
 
@@ -164,5 +176,254 @@ describe('nextAgentId', () => {
 
 	it('Agent が居なければ null を返す', () => {
 		expect(nextAgentId([], null, 1)).toBeNull();
+	});
+});
+
+describe('facilityMarkers', () => {
+	it('施設をキャンバス座標へ写す', () => {
+		const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const markers = facilityMarkers([{ id: 'store-0', type: 'store', x: 10, y: 20 }], transform);
+
+		expect(markers).toEqual([{ id: 'store-0', type: 'store', x: 10, y: 20 }]);
+	});
+});
+
+describe('accidentMarkers', () => {
+	const positions = [
+		{ id: 'agent-0', x: 10, y: 10 },
+		{ id: 'agent-1', x: 20, y: 20 },
+	];
+
+	it('事故を起こした Agent の描画位置を返す', () => {
+		expect(accidentMarkers(['agent-1'], positions)).toEqual([{ id: 'agent-1', x: 20, y: 20 }]);
+	});
+
+	it('地図上に居ない Agent は描かない', () => {
+		// 移動中の Agent は施設に紐づかず描画対象から外れている
+		expect(accidentMarkers(['agent-9'], positions)).toEqual([]);
+	});
+});
+
+describe('transmissionArrows', () => {
+	const positions = [
+		{ id: 'agent-0', x: 10, y: 10 },
+		{ id: 'agent-1', x: 50, y: 30 },
+		{ id: 'agent-2', x: 10, y: 10 },
+	];
+
+	it('伝播元から伝播先への矢印にする', () => {
+		const arrows = transmissionArrows(
+			[{ fromAgentId: 'agent-0', toAgentId: 'agent-1' }],
+			positions,
+		);
+
+		expect(arrows).toEqual([{ fromX: 10, fromY: 10, toX: 50, toY: 30 }]);
+	});
+
+	it('同じ組み合わせが複数回伝播しても 1 本にまとめる', () => {
+		const arrows = transmissionArrows(
+			[
+				{ fromAgentId: 'agent-0', toAgentId: 'agent-1' },
+				{ fromAgentId: 'agent-0', toAgentId: 'agent-1' },
+			],
+			positions,
+		);
+
+		expect(arrows).toHaveLength(1);
+	});
+
+	it('どちらかが地図上に居なければ描かない', () => {
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-9' }], positions),
+		).toEqual([]);
+	});
+
+	it('同じ位置に重なっている場合は描かない。点になって向きが読めないため', () => {
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-2' }], positions),
+		).toEqual([]);
+	});
+
+	it('同一施設で隣り合う 2 Agent は描かない。矢先より軸が短く塊になるため', () => {
+		const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const sameFacility = agentPositions(
+			[agent('agent-0', 'home-0'), agent('agent-1', 'home-0')],
+			FACILITIES,
+			transform,
+		);
+
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-1' }], sameFacility),
+		).toEqual([]);
+	});
+
+	it('同一施設でも離れて配置された 2 Agent は描く', () => {
+		const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const crowded = agentPositions(
+			Array.from({ length: 30 }, (_, index) => agent(`agent-${index}`, 'home-0')),
+			FACILITIES,
+			transform,
+		);
+
+		expect(
+			transmissionArrows([{ fromAgentId: 'agent-0', toAgentId: 'agent-29' }], crowded),
+		).toHaveLength(1);
+	});
+});
+
+describe('createCanvasTransform（ズーム・パン）', () => {
+	it('倍率を上げると同じ距離が広く描かれる', () => {
+		const base = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+		const zoomed = createCanvasTransform(WORLD_SIZE, WORLD_SIZE, {
+			...DEFAULT_VIEWPORT,
+			zoom: 2,
+		});
+
+		expect(zoomed.scale).toBe(base.scale * 2);
+	});
+
+	it('中心に指定した仮想座標が画面中央へ来る', () => {
+		const transform = createCanvasTransform(200, 200, { zoom: 2, centerX: 10, centerY: 90 });
+
+		expect(transform.toX(10)).toBeCloseTo(100, 10);
+		expect(transform.toY(90)).toBeCloseTo(100, 10);
+	});
+
+	it('キャンバス座標から仮想座標へ戻せる', () => {
+		// クリック位置を都市の座標で扱うために使う
+		const transform = createCanvasTransform(300, 200, { zoom: 3, centerX: 40, centerY: 60 });
+
+		expect(transform.toWorldX(transform.toX(25))).toBeCloseTo(25, 10);
+		expect(transform.toWorldY(transform.toY(70))).toBeCloseTo(70, 10);
+	});
+});
+
+describe('clampViewport', () => {
+	it('倍率を可動範囲へ収める', () => {
+		expect(clampViewport({ ...DEFAULT_VIEWPORT, zoom: 0.1 }).zoom).toBe(MIN_ZOOM);
+		expect(clampViewport({ ...DEFAULT_VIEWPORT, zoom: 999 }).zoom).toBe(MAX_ZOOM);
+	});
+
+	it('中心を都市の外へ出さない。都市を画面外へ追い出せてしまうため', () => {
+		expect(clampViewport({ zoom: 2, centerX: -50, centerY: 500 })).toEqual({
+			zoom: 2,
+			centerX: 0,
+			centerY: WORLD_SIZE,
+		});
+	});
+});
+
+describe('shouldAggregateAgents', () => {
+	it('1 地区あたりの人数が多く、寄せていなければ集約する', () => {
+		// 最大 Population 500 人・7 地区（1 地区 71 人）を想定
+		expect(shouldAggregateAgents(500, 7, MIN_ZOOM)).toBe(true);
+	});
+
+	it('標準 Population では集約しない。デモで Agent を直接クリックできるようにするため', () => {
+		expect(shouldAggregateAgents(300, 7, MIN_ZOOM)).toBe(false);
+	});
+
+	it('寄せれば人数によらず個別描画へ戻す', () => {
+		// ＋ ボタン 1 回でちょうど個別描画へ切り替わる境界
+		expect(shouldAggregateAgents(500, 7, INDIVIDUAL_RENDERING_MIN_ZOOM)).toBe(false);
+		expect(shouldAggregateAgents(500, 7, INDIVIDUAL_RENDERING_MIN_ZOOM - 0.1)).toBe(true);
+	});
+
+	it('地区が無ければ集約しない', () => {
+		expect(shouldAggregateAgents(500, 0, MIN_ZOOM)).toBe(false);
+	});
+});
+
+describe('districtClusters', () => {
+	const transform = createCanvasTransform(WORLD_SIZE, WORLD_SIZE);
+	const facilities = [
+		{ id: 'home-0', districtId: 'residential-0' },
+		{ id: 'workplace-0', districtId: 'office-0' },
+	];
+	const districts = [
+		{ id: 'residential-0', x: 10, y: 20 },
+		{ id: 'office-0', x: 60, y: 70 },
+	];
+	const states: Record<string, 'normal' | 'tired' | 'sleep_deprived' | 'severe_sleep_deprived'> = {
+		'agent-0': 'normal',
+		'agent-1': 'sleep_deprived',
+		'agent-2': 'sleep_deprived',
+	};
+	const stateOf = (agentId: string) => states[agentId] ?? 'normal';
+
+	it('地区ごとに人数と睡眠状態の内訳をまとめる', () => {
+		const clusters = districtClusters(
+			[
+				{ id: 'agent-0', currentLocationId: 'home-0' },
+				{ id: 'agent-1', currentLocationId: 'home-0' },
+				{ id: 'agent-2', currentLocationId: 'workplace-0' },
+			],
+			facilities,
+			districts,
+			stateOf,
+			transform,
+		);
+
+		expect(clusters).toHaveLength(2);
+		expect(clusters[0]?.total).toBe(2);
+		expect(clusters[0]?.countsByState.sleep_deprived).toBe(1);
+		expect(clusters[1]?.total).toBe(1);
+	});
+
+	it('誰も居ない地区は返さない', () => {
+		const clusters = districtClusters(
+			[{ id: 'agent-0', currentLocationId: 'home-0' }],
+			facilities,
+			districts,
+			stateOf,
+			transform,
+		);
+
+		expect(clusters.map((cluster) => cluster.districtId)).toEqual(['residential-0']);
+	});
+
+	it('移動中の Agent は数えない。個別描画と同じ扱いにする', () => {
+		const clusters = districtClusters(
+			[{ id: 'agent-0', currentLocationId: 'on-the-road' }],
+			facilities,
+			districts,
+			stateOf,
+			transform,
+		);
+
+		expect(clusters).toEqual([]);
+	});
+
+	it('クリックで寄せられるよう仮想座標も返す', () => {
+		const clusters = districtClusters(
+			[{ id: 'agent-0', currentLocationId: 'home-0' }],
+			facilities,
+			districts,
+			stateOf,
+			transform,
+		);
+
+		expect(clusters[0]?.worldX).toBe(10);
+		expect(clusters[0]?.worldY).toBe(20);
+	});
+});
+
+describe('clusterAt', () => {
+	const cluster = {
+		districtId: 'residential-0',
+		x: 100,
+		y: 100,
+		worldX: 10,
+		worldY: 20,
+		total: 50,
+		countsByState: { normal: 50, tired: 0, sleep_deprived: 0, severe_sleep_deprived: 0 },
+	};
+
+	it('円の内側なら当たる', () => {
+		expect(clusterAt([cluster], { x: 100, y: 100 })?.districtId).toBe('residential-0');
+	});
+
+	it('円の外なら当たらない', () => {
+		expect(clusterAt([cluster], { x: 100, y: 100 + clusterRadius(50) + 1 })).toBeNull();
 	});
 });

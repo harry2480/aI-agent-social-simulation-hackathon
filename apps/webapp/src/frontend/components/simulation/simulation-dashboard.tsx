@@ -382,6 +382,8 @@ export function SimulationDashboard({ replay }: SimulationDashboardProps) {
 							agents={view.agents}
 							sleepStateOf={sleepStateOf}
 							congestedRoadIds={view.congestedRoadIds}
+							accidentAgentIds={view.accidentAgentIds}
+							transmissions={view.transmissions}
 							selectedAgentId={selectedAgentId}
 							onSelectAgent={selectAgent}
 						/>
