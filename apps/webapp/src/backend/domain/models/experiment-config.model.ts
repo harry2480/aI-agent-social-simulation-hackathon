@@ -118,17 +118,27 @@ export class ExperimentConfig {
 		if (!Number.isInteger(params.days) || params.days < 1 || params.days > MAX_DAYS) {
 			return { success: false, error: 'DAYS_OUT_OF_RANGE' };
 		}
-		if (params.initialSleepDeprivedRate < 0 || params.initialSleepDeprivedRate > 1) {
+		// NaN は比較演算子がすべて false になり範囲判定をすり抜けるため、有限数であることから確かめる。
+		// すり抜けた NaN は Patient Zero の人数や事故確率へそのまま流れ、Run 全体が壊れる
+		if (
+			!Number.isFinite(params.initialSleepDeprivedRate) ||
+			params.initialSleepDeprivedRate < 0 ||
+			params.initialSleepDeprivedRate > 1
+		) {
 			return { success: false, error: 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE' };
 		}
 
 		const initialSleepDebtHours = params.initialSleepDebtHours ?? DEFAULT_INITIAL_SLEEP_DEBT_HOURS;
-		if (initialSleepDebtHours < 0 || initialSleepDebtHours > MAX_INITIAL_SLEEP_DEBT_HOURS) {
+		if (
+			!Number.isFinite(initialSleepDebtHours) ||
+			initialSleepDebtHours < 0 ||
+			initialSleepDebtHours > MAX_INITIAL_SLEEP_DEBT_HOURS
+		) {
 			return { success: false, error: 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE' };
 		}
 
 		const trafficLevel = params.trafficLevel ?? DEFAULT_TRAFFIC_LEVEL;
-		if (trafficLevel <= 0 || trafficLevel > MAX_TRAFFIC_LEVEL) {
+		if (!Number.isFinite(trafficLevel) || trafficLevel <= 0 || trafficLevel > MAX_TRAFFIC_LEVEL) {
 			return { success: false, error: 'TRAFFIC_LEVEL_OUT_OF_RANGE' };
 		}
 
@@ -136,16 +146,21 @@ export class ExperimentConfig {
 		// 昇順が崩れると状態が飛び、Cascade Reach と Rs の集計がそのまま狂う
 		const { tired, sleepDeprived, severe } =
 			params.sleepStateThresholds ?? DEFAULT_SLEEP_STATE_THRESHOLDS;
-		if (!(tired > 0 && tired < sleepDeprived && sleepDeprived < severe)) {
+		// severe が有限なら、昇順が成り立つ時点で tired・sleepDeprived も有限になる
+		if (
+			!(tired > 0 && tired < sleepDeprived && sleepDeprived < severe && Number.isFinite(severe))
+		) {
 			return { success: false, error: 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING' };
 		}
 
 		// Cascade 成立の判定条件そのもの。ここが崩れると実験結果の解釈が変わる
 		const cascade = params.cascadeThresholds ?? DEFAULT_CASCADE_THRESHOLDS;
 		if (
+			!Number.isFinite(cascade.rsThreshold) ||
 			cascade.rsThreshold <= 0 ||
 			!Number.isInteger(cascade.minGenerations) ||
 			cascade.minGenerations < 1 ||
+			!Number.isFinite(cascade.minReachRate) ||
 			cascade.minReachRate < 0 ||
 			cascade.minReachRate > 1
 		) {

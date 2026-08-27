@@ -134,6 +134,51 @@ describe('ExperimentConfig', () => {
 			expectError({ ...valid, cascadeThresholds }, 'CASCADE_THRESHOLDS_OUT_OF_RANGE');
 		});
 
+		// NaN は比較演算子がすべて false になるため、範囲判定だけでは素通りする
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'初期睡眠不足率 %s は INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+			(initialSleepDeprivedRate) => {
+				expectError(
+					{ ...valid, initialSleepDeprivedRate },
+					'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+				);
+			},
+		);
+
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'初期 Sleep Debt %s は INITIAL_SLEEP_DEBT_OUT_OF_RANGE',
+			(initialSleepDebtHours) => {
+				expectError({ ...valid, initialSleepDebtHours }, 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE');
+			},
+		);
+
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'trafficLevel %s は TRAFFIC_LEVEL_OUT_OF_RANGE',
+			(trafficLevel) => {
+				expectError({ ...valid, trafficLevel }, 'TRAFFIC_LEVEL_OUT_OF_RANGE');
+			},
+		);
+
+		it.each([
+			{ tired: Number.NaN, sleepDeprived: 1, severe: 2 },
+			{ tired: 1, sleepDeprived: Number.NaN, severe: 2 },
+			{ tired: 1, sleepDeprived: 2, severe: Number.NaN },
+			{ tired: 1, sleepDeprived: 2, severe: Number.POSITIVE_INFINITY },
+		])('睡眠状態の閾値 %o は SLEEP_STATE_THRESHOLDS_NOT_ASCENDING', (sleepStateThresholds) => {
+			expectError({ ...valid, sleepStateThresholds }, 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING');
+		});
+
+		it.each([
+			{ rsThreshold: Number.NaN, minGenerations: 2, minReachRate: 0.1 },
+			{ rsThreshold: Number.POSITIVE_INFINITY, minGenerations: 2, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: Number.NaN, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: Number.POSITIVE_INFINITY, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: 2, minReachRate: Number.NaN },
+			{ rsThreshold: 1, minGenerations: 2, minReachRate: Number.NEGATIVE_INFINITY },
+		])('Cascade 判定 %o は CASCADE_THRESHOLDS_OUT_OF_RANGE', (cascadeThresholds) => {
+			expectError({ ...valid, cascadeThresholds }, 'CASCADE_THRESHOLDS_OUT_OF_RANGE');
+		});
+
 		it('閾値を上書きできる', () => {
 			const thresholds = { tired: 0.5, sleepDeprived: 1, severe: 2 };
 			expect(
