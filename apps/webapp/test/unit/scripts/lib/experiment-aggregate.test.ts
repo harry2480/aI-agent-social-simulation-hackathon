@@ -160,6 +160,34 @@ describe('aggregateSummaries', () => {
 		expect(aggregateSummaries('label', summaries).totalSleepLossMinutes).toBe(200);
 	});
 
+	it('介入の副作用を読む指標を Run あたりの平均で持つ', () => {
+		// 伝播が減っても事故や残業が増えているなら、その介入は成功と言えない（要件定義 32 章）
+		const summaries = [
+			summary({
+				totalSleepDebtHours: 100,
+				cascadeDepth: 2,
+				accidentCount: 4,
+				overtimeHours: 30,
+				averageCommuteDelayMinutes: 10,
+			}),
+			summary({
+				totalSleepDebtHours: 200,
+				cascadeDepth: 4,
+				accidentCount: 6,
+				overtimeHours: 50,
+				averageCommuteDelayMinutes: 20,
+			}),
+		];
+
+		const aggregate = aggregateSummaries('mandatory-rest', summaries);
+
+		expect(aggregate.averageSleepDebtHours).toBe(150);
+		expect(aggregate.averageCascadeDepth).toBe(3);
+		expect(aggregate.averageAccidentCount).toBe(5);
+		expect(aggregate.averageOvertimeHours).toBe(40);
+		expect(aggregate.averageCommuteDelayMinutes).toBe(15);
+	});
+
 	it('ラベルと Run 数をそのまま持つ', () => {
 		const aggregate = aggregateSummaries('mandatory-rest', [summary(), summary()]);
 

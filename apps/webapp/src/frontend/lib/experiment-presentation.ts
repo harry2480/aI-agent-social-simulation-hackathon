@@ -36,30 +36,70 @@ export interface ComparisonRow {
 	outbreakProbability: number | null;
 	/** Rs が閾値を超えたあと収束し始めた世代の平均。古い実験や山が無い条件では null */
 	averageDampingGeneration: number | null;
+	/**
+	 * 介入の副作用を読むための指標（要件定義 32・39 章）。
+	 * これらを集計へ加える前に保存された実験には存在しないため null になる。
+	 */
+	averageSleepDebtHours: number | null;
+	averageCascadeDepth: number | null;
+	averageAccidentCount: number | null;
+	averageOvertimeHours: number | null;
+	averageCommuteDelayMinutes: number | null;
 }
 
 interface SupplementaryAggregate {
 	outbreakProbability?: unknown;
 	averageDampingGeneration?: unknown;
+	averageSleepDebtHours?: unknown;
+	averageCascadeDepth?: unknown;
+	averageAccidentCount?: unknown;
+	averageOvertimeHours?: unknown;
+	averageCommuteDelayMinutes?: unknown;
+}
+
+/** 数値として保存されていない補助指標は「その実験には無い」として null にする */
+function optionalNumber(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 /**
  * 補助指標は experiment_results の aggregate（JSON）にだけ入っている。
  * これらを追加する前に保存された実験には存在しないため、読めない場合は null を返す。
  */
-function readSupplementary(aggregate: unknown): {
-	outbreakProbability: number | null;
-	averageDampingGeneration: number | null;
-} {
+type Supplementary = Pick<
+	ComparisonRow,
+	| 'outbreakProbability'
+	| 'averageDampingGeneration'
+	| 'averageSleepDebtHours'
+	| 'averageCascadeDepth'
+	| 'averageAccidentCount'
+	| 'averageOvertimeHours'
+	| 'averageCommuteDelayMinutes'
+>;
+
+const EMPTY_SUPPLEMENTARY: Supplementary = {
+	outbreakProbability: null,
+	averageDampingGeneration: null,
+	averageSleepDebtHours: null,
+	averageCascadeDepth: null,
+	averageAccidentCount: null,
+	averageOvertimeHours: null,
+	averageCommuteDelayMinutes: null,
+};
+
+function readSupplementary(aggregate: unknown): Supplementary {
 	if (typeof aggregate !== 'object' || aggregate === null) {
-		return { outbreakProbability: null, averageDampingGeneration: null };
+		return EMPTY_SUPPLEMENTARY;
 	}
 	const fields = aggregate as SupplementaryAggregate;
 	return {
-		outbreakProbability:
-			typeof fields.outbreakProbability === 'number' ? fields.outbreakProbability : null,
-		averageDampingGeneration:
-			typeof fields.averageDampingGeneration === 'number' ? fields.averageDampingGeneration : null,
+		outbreakProbability: optionalNumber(fields.outbreakProbability),
+		averageDampingGeneration: optionalNumber(fields.averageDampingGeneration),
+		averageSleepDebtHours: optionalNumber(fields.averageSleepDebtHours),
+		averageCascadeDepth: optionalNumber(fields.averageCascadeDepth),
+		averageAccidentCount: optionalNumber(fields.averageAccidentCount),
+		averageOvertimeHours: optionalNumber(fields.averageOvertimeHours),
+		averageCommuteDelayMinutes: optionalNumber(fields.averageCommuteDelayMinutes),
 	};
 }
 

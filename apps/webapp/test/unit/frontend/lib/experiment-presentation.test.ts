@@ -51,16 +51,52 @@ describe('toComparisonRows の補助指標', () => {
 		expect(rows[0]?.averageDampingGeneration).toBeNull();
 	});
 
+	it('aggregate JSON から介入の副作用指標を読む', () => {
+		const rows = toComparisonRows([
+			{
+				...aggregate('mandatory-rest', 12),
+				aggregate: {
+					averageSleepDebtHours: 150,
+					averageCascadeDepth: 3,
+					averageAccidentCount: 5,
+					averageOvertimeHours: 40,
+					averageCommuteDelayMinutes: 15,
+				},
+			},
+		]);
+
+		expect(rows[0]?.averageSleepDebtHours).toBe(150);
+		expect(rows[0]?.averageCascadeDepth).toBe(3);
+		expect(rows[0]?.averageAccidentCount).toBe(5);
+		expect(rows[0]?.averageOvertimeHours).toBe(40);
+		expect(rows[0]?.averageCommuteDelayMinutes).toBe(15);
+	});
+
+	it('副作用指標を持たない過去の実験では null になる', () => {
+		const rows = toComparisonRows([aggregate('baseline', 9)]);
+
+		expect(rows[0]?.averageSleepDebtHours).toBeNull();
+		expect(rows[0]?.averageCascadeDepth).toBeNull();
+		expect(rows[0]?.averageAccidentCount).toBeNull();
+		expect(rows[0]?.averageOvertimeHours).toBeNull();
+		expect(rows[0]?.averageCommuteDelayMinutes).toBeNull();
+	});
+
 	it('数値以外が入っていても null として扱う', () => {
 		const rows = toComparisonRows([
 			{
 				...aggregate('baseline', 9),
-				aggregate: { outbreakProbability: '1', averageDampingGeneration: null },
+				aggregate: {
+					outbreakProbability: '1',
+					averageDampingGeneration: null,
+					averageAccidentCount: Number.NaN,
+				},
 			},
 		]);
 
 		expect(rows[0]?.outbreakProbability).toBeNull();
 		expect(rows[0]?.averageDampingGeneration).toBeNull();
+		expect(rows[0]?.averageAccidentCount).toBeNull();
 	});
 });
 

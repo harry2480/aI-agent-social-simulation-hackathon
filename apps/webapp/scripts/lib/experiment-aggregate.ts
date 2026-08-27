@@ -21,6 +21,17 @@ export interface Aggregate {
 	averageReach: number;
 	totalSleepLossMinutes: number;
 	standardDeviation: number;
+	/**
+	 * 介入の副作用まで読むための指標（要件定義 32・39 章）。
+	 *
+	 * Cascade Reach だけを見ると「残業を止めれば伝播が減る」までしか分からない。
+	 * 事故・残業・通勤遅延まで並べて初めて、その介入が何と引き換えかが読める。
+	 */
+	averageSleepDebtHours: number;
+	averageCascadeDepth: number;
+	averageAccidentCount: number;
+	averageOvertimeHours: number;
+	averageCommuteDelayMinutes: number;
 }
 
 /**
@@ -99,6 +110,13 @@ export function aggregateSummaries(label: string, summaries: readonly RunSummary
 		averageReach: average(reaches),
 		totalSleepLossMinutes: average(summaries.map((summary) => summary.totalSleepLossMinutes)),
 		standardDeviation: standardDeviation(reaches),
+		averageSleepDebtHours: average(summaries.map((summary) => summary.totalSleepDebtHours)),
+		averageCascadeDepth: average(summaries.map((summary) => summary.cascadeDepth)),
+		averageAccidentCount: average(summaries.map((summary) => summary.accidentCount)),
+		averageOvertimeHours: average(summaries.map((summary) => summary.overtimeHours)),
+		averageCommuteDelayMinutes: average(
+			summaries.map((summary) => summary.averageCommuteDelayMinutes),
+		),
 	};
 }
 
