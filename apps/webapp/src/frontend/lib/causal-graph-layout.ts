@@ -44,6 +44,79 @@ export function causalNodeLabel(node: CausalGraphNode): string {
 	return `${origin.marker} ${formatEventLabel(node.type)}\n${formatTickLabel(node.tick)}${impact}\n${node.actorId ?? '-'}`;
 }
 
+export interface CausalNodeDetailRow {
+	label: string;
+	value: string;
+}
+
+/** 影響は種類ごとに単位が違うため、値のある項目だけを並べる */
+function impactSummary(node: CausalGraphNode): string {
+	const parts: string[] = [];
+	if (node.delayMinutes !== undefined) {
+		parts.push(`遅延 +${node.delayMinutes} min`);
+	}
+	if (node.sleepLossMinutes !== undefined) {
+		parts.push(`睡眠 -${node.sleepLossMinutes} min`);
+	}
+	if (node.fatigueDelta !== undefined) {
+		parts.push(`Fatigue ${node.fatigueDelta >= 0 ? '+' : ''}${node.fatigueDelta}`);
+	}
+	if (node.stressDelta !== undefined) {
+		parts.push(`Stress ${node.stressDelta >= 0 ? '+' : ''}${node.stressDelta}`);
+	}
+	return parts.length === 0 ? '-' : parts.join(' / ');
+}
+
+/** 親 Event は ID だけでは何の出来事か読めないため、種別と時刻を添える */
+function parentSummary(subgraph: CausalSubgraph, eventId: string): string {
+	const nodeById = new Map(subgraph.nodes.map((node) => [node.eventId, node]));
+	const parents = subgraph.edges
+		.filter((edge) => edge.toEventId === eventId)
+		.map((edge) => nodeById.get(edge.fromEventId))
+		.filter((node): node is CausalGraphNode => node !== undefined)
+		.map((node) => `${formatEventLabel(node.type)} (${formatTickLabel(node.tick)})`);
+
+	return parents.length === 0 ? '-' : parents.join(', ');
+}
+
+/**
+ * 選択したノードの詳細（要件定義 38 章）。
+ *
+ * ノードのラベルは重ならない大きさに収める必要があり、種別・時刻・影響までしか書けない。
+ * 「なぜその行動を選んだのか」は AI の判断理由にしか無いため、選択時に別途並べる。
+ */
+export function causalNodeDetailRows(
+	subgraph: CausalSubgraph | null,
+	eventId: string | null,
+): CausalNodeDetailRow[] {
+	if (subgraph === null || eventId === null) {
+		return [];
+	}
+	const node = subgraph.nodes.find((candidate) => candidate.eventId === eventId);
+	if (node === undefined) {
+		return [];
+	}
+
+	const rows: CausalNodeDetailRow[] = [
+		{ label: 'Event', value: formatEventLabel(node.type) },
+		{ label: 'Agent', value: node.actorId ?? '-' },
+		{ label: 'Timestamp', value: formatTickLabel(node.tick) },
+		{ label: 'Impact', value: impactSummary(node) },
+		{ label: 'Parent Event', value: parentSummary(subgraph, node.eventId) },
+	];
+
+	// AI 判断以外の Event で空欄を並べると、判断の有無が読み取りにくくなる
+	if (node.decision !== undefined) {
+		rows.push(
+			{ label: 'AI Decision', value: node.decision.action },
+			{ label: 'Decision Reason', value: node.decision.reason },
+			{ label: 'AI Model', value: node.decision.model },
+		);
+	}
+
+	return rows;
+}
+
 /**
  * 部分グラフを描画位置へ変換する。
  *

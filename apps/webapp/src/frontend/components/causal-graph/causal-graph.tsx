@@ -12,13 +12,43 @@ import '@xyflow/react/dist/style.css';
 import type { CausalSubgraph } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import { EventOriginLegend } from '@/frontend/components/event-origin/event-origin-legend';
 import { Card, CardContent, CardHeader, CardTitle } from '@/frontend/components/ui/card';
-import { COLUMN_WIDTH, toCausalGraphLayout } from '@/frontend/lib/causal-graph-layout';
+import type { CausalNodeDetailRow } from '@/frontend/lib/causal-graph-layout';
+import {
+	COLUMN_WIDTH,
+	causalNodeDetailRows,
+	toCausalGraphLayout,
+} from '@/frontend/lib/causal-graph-layout';
 import { useMemo } from 'react';
 
 interface CausalGraphProps {
 	subgraph: CausalSubgraph | null;
 	selectedEventId: string | null;
 	onSelectEvent: (eventId: string) => void;
+}
+
+/**
+ * 選択したノードの詳細（要件定義 38 章）。
+ * ノードのラベルには収まらない AI の判断理由をここで読ませる。
+ */
+function CausalNodeDetail({ rows }: { rows: CausalNodeDetailRow[] }) {
+	if (rows.length === 0) {
+		return (
+			<p className="border-t px-4 py-2 text-xs text-muted-foreground">
+				ノードを選ぶと、その Event の詳細を表示します。
+			</p>
+		);
+	}
+
+	return (
+		<dl className="max-h-32 shrink-0 overflow-y-auto border-t px-4 py-2 text-xs">
+			{rows.map((row) => (
+				<div key={row.label} className="flex gap-2 py-0.5">
+					<dt className="w-32 shrink-0 text-muted-foreground">{row.label}</dt>
+					<dd className="min-w-0 break-words">{row.value}</dd>
+				</div>
+			))}
+		</dl>
+	);
 }
 
 /**
@@ -64,6 +94,11 @@ export function CausalGraph({ subgraph, selectedEventId, onSelectEvent }: Causal
 		return { nodes: flowNodes, edges: flowEdges };
 	}, [subgraph, selectedEventId]);
 
+	const detailRows = useMemo(
+		() => causalNodeDetailRows(subgraph, selectedEventId),
+		[subgraph, selectedEventId],
+	);
+
 	const handleNodeClick: NodeMouseHandler = (_event, node) => {
 		onSelectEvent(node.id);
 	};
@@ -87,18 +122,23 @@ export function CausalGraph({ subgraph, selectedEventId, onSelectEvent }: Causal
 						Timeline か City Map から Agent / Event を選ぶと、その因果連鎖を表示します。
 					</p>
 				) : (
-					<ReactFlow
-						nodes={nodes}
-						edges={edges}
-						onNodeClick={handleNodeClick}
-						fitView
-						proOptions={{ hideAttribution: true }}
-						nodesDraggable={false}
-						nodesConnectable={false}
-					>
-						<Background />
-						<Controls showInteractive={false} />
-					</ReactFlow>
+					<div className="flex h-full min-h-0 flex-col">
+						<div className="min-h-0 flex-1">
+							<ReactFlow
+								nodes={nodes}
+								edges={edges}
+								onNodeClick={handleNodeClick}
+								fitView
+								proOptions={{ hideAttribution: true }}
+								nodesDraggable={false}
+								nodesConnectable={false}
+							>
+								<Background />
+								<Controls showInteractive={false} />
+							</ReactFlow>
+						</div>
+						<CausalNodeDetail rows={detailRows} />
+					</div>
 				)}
 			</CardContent>
 		</Card>

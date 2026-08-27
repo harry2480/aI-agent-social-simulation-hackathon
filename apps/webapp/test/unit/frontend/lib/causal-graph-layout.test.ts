@@ -5,9 +5,11 @@ import type {
 import {
 	COLUMN_WIDTH,
 	ROW_HEIGHT,
+	causalNodeDetailRows,
 	causalNodeLabel,
 	toCausalGraphLayout,
 } from '@/frontend/lib/causal-graph-layout';
+import { formatTickLabel } from '@/frontend/lib/format';
 import { describe, expect, it } from 'vitest';
 
 function node(overrides: Partial<CausalGraphNode> = {}): CausalGraphNode {
@@ -19,6 +21,9 @@ function node(overrides: Partial<CausalGraphNode> = {}): CausalGraphNode {
 		depth: 0,
 		delayMinutes: undefined,
 		sleepLossMinutes: undefined,
+		fatigueDelta: undefined,
+		stressDelta: undefined,
+		decision: undefined,
 		distanceFromFocus: 0,
 		...overrides,
 	};
@@ -140,5 +145,102 @@ describe('toCausalGraphLayout', () => {
 		);
 
 		expect(layout.edges).toEqual([{ id: 'e1->e2', source: 'e1', target: 'e2' }]);
+	});
+});
+
+describe('causalNodeDetailRows', () => {
+	function rowValue(
+		rows: ReturnType<typeof causalNodeDetailRows>,
+		label: string,
+	): string | undefined {
+		return rows.find((row) => row.label === label)?.value;
+	}
+
+	it('Event・Agent・時刻を並べる', () => {
+		const rows = causalNodeDetailRows(
+			subgraph([node({ eventId: 'e1', type: 'accident', tick: 36, actorId: 'agent-0007' })]),
+			'e1',
+		);
+
+		expect(rowValue(rows, 'Event')).toBe('Accident');
+		expect(rowValue(rows, 'Agent')).toBe('agent-0007');
+		expect(rowValue(rows, 'Timestamp')).toBe(formatTickLabel(36));
+	});
+
+	it('影響は値のある項目だけを単位付きで並べる', () => {
+		const rows = causalNodeDetailRows(
+			subgraph([node({ eventId: 'e1', delayMinutes: 22, fatigueDelta: 4 })]),
+			'e1',
+		);
+
+		expect(rowValue(rows, 'Impact')).toBe('遅延 +22 min / Fatigue +4');
+	});
+
+	it('影響を持たない Event は - を出す', () => {
+		expect(
+			rowValue(causalNodeDetailRows(subgraph([node({ eventId: 'e1' })]), 'e1'), 'Impact'),
+		).toBe('-');
+	});
+
+	it('親 Event は ID ではなく種別と時刻で示す', () => {
+		// ID だけでは何の出来事が原因だったのか読めない
+		const rows = causalNodeDetailRows(
+			subgraph(
+				[
+					node({ eventId: 'e1', type: 'accident', tick: 36 }),
+					node({ eventId: 'e2', type: 'traffic_jam', tick: 37 }),
+				],
+				[{ fromEventId: 'e1', toEventId: 'e2' }],
+			),
+			'e2',
+		);
+
+		expect(rowValue(rows, 'Parent Event')).toBe(`Accident (${formatTickLabel(36)})`);
+	});
+
+	it('起点の Event は親を持たないため - を出す', () => {
+		const rows = causalNodeDetailRows(subgraph([node({ eventId: 'e1' })]), 'e1');
+
+		expect(rowValue(rows, 'Parent Event')).toBe('-');
+	});
+
+	it('AI が選んだ行動と理由とモデルを出す', () => {
+		// ノードのラベルには収まらないため、選択時にここで読ませる（要件定義 38 章）
+		const rows = causalNodeDetailRows(
+			subgraph([
+				node({
+					eventId: 'e1',
+					type: 'decision',
+					decision: {
+						action: 'continue_driving',
+						reason: '配送の締め切りに間に合わせるため',
+						model: 'google/gemma-3-27b-it',
+					},
+				}),
+			]),
+			'e1',
+		);
+
+		expect(rowValue(rows, 'AI Decision')).toBe('continue_driving');
+		expect(rowValue(rows, 'Decision Reason')).toBe('配送の締め切りに間に合わせるため');
+		expect(rowValue(rows, 'AI Model')).toBe('google/gemma-3-27b-it');
+	});
+
+	it('AI 判断以外の Event では判断の行を出さない', () => {
+		// 空欄を並べると、判断があったのか無かったのかが読み取れない
+		const rows = causalNodeDetailRows(subgraph([node({ eventId: 'e1', type: 'accident' })]), 'e1');
+
+		expect(rowValue(rows, 'AI Decision')).toBeUndefined();
+		expect(rowValue(rows, 'Decision Reason')).toBeUndefined();
+	});
+
+	it('ノードが選ばれていなければ空にする', () => {
+		expect(causalNodeDetailRows(subgraph([node()]), null)).toEqual([]);
+		expect(causalNodeDetailRows(null, 'e1')).toEqual([]);
+	});
+
+	it('グラフに含まれない Event を指されても空にする', () => {
+		// 打ち切りで表示外になったノードを Timeline から選ぶことがある
+		expect(causalNodeDetailRows(subgraph([node({ eventId: 'e1' })]), 'e9')).toEqual([]);
 	});
 });

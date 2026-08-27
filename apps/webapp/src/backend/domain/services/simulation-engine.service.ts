@@ -594,6 +594,7 @@ export class SimulationEngine {
 				tick,
 				type: 'decision',
 				actorId: agent.id,
+				decision: result,
 			}),
 		);
 
@@ -748,6 +749,7 @@ export class SimulationEngine {
 				causes: runtime.delayCauseEventIds
 					.map((id) => state.eventById(id))
 					.filter((event): event is SimulationEvent => event !== undefined),
+				decision: result,
 			}),
 		);
 
