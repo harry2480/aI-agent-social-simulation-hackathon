@@ -14,17 +14,24 @@ export interface AgentDetailRow {
  * 桁数は項目ごとに変える。Sleep Debt は伝播の判定に効くため 2 桁、
  * Fatigue / Stress は 0〜100 の目安なので整数で足りる。
  */
+/** 初日の未明はまだ 1 晩も明けておらず、0 h と書くと「一睡もしなかった」と読めるため区別する */
+function formatLastSleep(hours: number | null): string {
+	return hours === null ? '-' : `${formatNumber(hours, 1)} h`;
+}
+
 export function agentDetailRows(agent: Agent, generation: number | undefined): AgentDetailRow[] {
 	return [
 		{ label: 'Role', value: formatRoleLabel(agent.role) },
 		{ label: 'Current Location', value: agent.currentLocationId },
 		{ label: 'Current Action', value: agent.currentAction },
 		{ label: 'Sleep Need', value: `${formatNumber(agent.sleepNeedHours, 1)} h` },
+		{ label: 'Last Sleep', value: formatLastSleep(agent.lastSleepHours) },
 		{ label: 'Sleep Debt', value: `${formatNumber(agent.sleepDebtHours, 2)} h` },
 		{ label: 'Fatigue', value: formatNumber(agent.fatigue, 0) },
 		{ label: 'Stress', value: formatNumber(agent.stress, 0) },
 		{ label: 'Responsibility', value: formatNumber(agent.responsibility) },
 		{ label: 'Risk Tolerance', value: formatNumber(agent.riskTolerance) },
+		{ label: 'Work Pressure', value: formatNumber(agent.workPressure) },
 		{ label: 'Cooperativeness', value: formatNumber(agent.cooperativeness) },
 		{ label: 'Family Responsibility', value: formatNumber(agent.familyResponsibility) },
 		{ label: 'Generation', value: generation === undefined ? '-' : String(generation) },

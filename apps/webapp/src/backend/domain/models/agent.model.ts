@@ -48,6 +48,7 @@ export class Agent {
 	private _workPressure: number;
 	private _currentAction: AgentActionName;
 	private _sleepMinutesThisNight: number;
+	private _lastSleepHours: number | null;
 	private _lastDecision: AgentDecisionRecord | undefined;
 	private _lastSleepStateName: SleepStateName;
 
@@ -70,6 +71,8 @@ export class Agent {
 			workPressure: number;
 			currentAction: AgentActionName;
 			sleepMinutesThisNight: number;
+			/** 直近 1 晩の実睡眠時間。まだ 1 晩も明けていない場合は undefined */
+			lastSleepHours?: number;
 			lastDecision?: AgentDecisionRecord;
 			lastSleepStateName: SleepStateName;
 		},
@@ -81,6 +84,7 @@ export class Agent {
 		this._workPressure = params.workPressure;
 		this._currentAction = params.currentAction;
 		this._sleepMinutesThisNight = params.sleepMinutesThisNight;
+		this._lastSleepHours = params.lastSleepHours ?? null;
 		this._lastDecision = params.lastDecision;
 		this._lastSleepStateName = params.lastSleepStateName;
 	}
@@ -139,6 +143,7 @@ export class Agent {
 		workPressure: number;
 		currentAction: AgentActionName;
 		sleepMinutesThisNight: number;
+		lastSleepHours?: number;
 		lastDecision?: AgentDecisionRecord;
 		lastSleepStateName: SleepStateName;
 	}): Agent {
@@ -182,6 +187,16 @@ export class Agent {
 
 	get sleepMinutesThisNight(): number {
 		return this._sleepMinutesThisNight;
+	}
+
+	/**
+	 * 直近 1 晩に実際に眠れた時間。まだ 1 晩も明けていない場合は null。
+	 *
+	 * sleepMinutesThisNight は起床時に 0 へ戻るため、日中は「今夜まだ寝ていない」しか表さない。
+	 * Sleep Need に対してどれだけ足りなかったかを日中も読めるよう、明けた晩の実績を残す。
+	 */
+	get lastSleepHours(): number | null {
+		return this._lastSleepHours;
 	}
 
 	get lastDecision(): AgentDecisionRecord | undefined {
@@ -251,6 +266,7 @@ export class Agent {
 		}
 
 		this._sleepDebtHours = Math.max(0, this._sleepDebtHours);
+		this._lastSleepHours = actualSleepHours;
 		this._sleepMinutesThisNight = 0;
 		return { deficitHours, recoveredHours };
 	}

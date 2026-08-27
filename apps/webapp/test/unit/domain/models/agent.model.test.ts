@@ -107,6 +107,26 @@ describe('Agent', () => {
 			agent.applyNightSleep(0.5);
 			expect(agent.sleepMinutesThisNight).toBe(0);
 		});
+
+		it('明けた晩の実睡眠時間を残す。日中も Sleep Need との差を読めるようにする', () => {
+			const agent = createAgent();
+			agent.recordSleepMinutes(300);
+			agent.applyNightSleep(0.5);
+			expect(agent.lastSleepHours).toBeCloseTo(5, 5);
+		});
+
+		it('1 晩も明けていない間は null。0 h と区別する', () => {
+			expect(createAgent().lastSleepHours).toBeNull();
+		});
+
+		it('晩ごとに上書きする', () => {
+			const agent = createAgent();
+			agent.recordSleepMinutes(300);
+			agent.applyNightSleep(0.5);
+			agent.recordSleepMinutes(420);
+			agent.applyNightSleep(0.5);
+			expect(agent.lastSleepHours).toBeCloseTo(7, 5);
+		});
 	});
 
 	describe('commitSleepStateTransition', () => {

@@ -73,6 +73,23 @@ describe('agentDetailRows', () => {
 		expect(rowValue(rows, 'Risk Tolerance')).toBe('0.12');
 	});
 
+	it('Last Sleep は 1 桁で出す', () => {
+		expect(rowValue(agentDetailRows(testAgent({ lastSleepHours: 5.25 }), 0), 'Last Sleep')).toBe(
+			'5.3 h',
+		);
+	});
+
+	it('1 晩も明けていない Agent の Last Sleep は - を出す', () => {
+		// 0 h と書くと「一睡もしなかった」と読める
+		expect(rowValue(agentDetailRows(testAgent(), 0), 'Last Sleep')).toBe('-');
+	});
+
+	it('Work Pressure を出す。残業の連鎖を読むのに要る', () => {
+		expect(rowValue(agentDetailRows(testAgent({ workPressure: 0.7654 }), 0), 'Work Pressure')).toBe(
+			'0.77',
+		);
+	});
+
 	it('Generation が無い Agent は - を出す', () => {
 		// 伝播に巻き込まれていない Agent は世代を持たない
 		expect(rowValue(agentDetailRows(testAgent(), undefined), 'Generation')).toBe('-');
