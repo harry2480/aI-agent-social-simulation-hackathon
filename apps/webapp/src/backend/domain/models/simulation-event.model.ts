@@ -26,8 +26,13 @@ export type EventType =
 export const MAX_EVENT_DEPTH = 10;
 
 /** 都市内の Network 種別（要件定義 5 章） */
-export type NetworkName = 'transportation' | 'work' | 'household';
+export type NetworkName = 'transportation' | 'work' | 'logistics' | 'household';
 
+/**
+ * Logistics Network（Logistics Hub → Delivery Worker → Store）は Work Network とは別に数える。
+ * 遅配とその先の店舗業務の遅れは、職場の上下関係ではなく物流の連鎖で伝わるため、
+ * 同じ Network に混ぜると Cross-network Spread が横断の実態より小さく出る（要件定義 5・31 章）。
+ */
 const NETWORK_BY_EVENT_TYPE: Partial<Record<EventType, NetworkName>> = {
 	accident: 'transportation',
 	traffic_jam: 'transportation',
@@ -36,8 +41,8 @@ const NETWORK_BY_EVENT_TYPE: Partial<Record<EventType, NetworkName>> = {
 	work_delay: 'work',
 	work_failure: 'work',
 	overtime: 'work',
-	delivery_delay: 'work',
-	store_delay: 'work',
+	delivery_delay: 'logistics',
+	store_delay: 'logistics',
 	household_delay: 'household',
 };
 
