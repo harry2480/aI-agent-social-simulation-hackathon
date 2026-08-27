@@ -67,7 +67,9 @@ export {
 	DEFAULT_CASCADE_THRESHOLDS,
 	ExperimentConfig,
 	MAX_DAYS,
+	MAX_INITIAL_SLEEP_DEBT_HOURS,
 	MAX_POPULATION,
+	MAX_TRAFFIC_LEVEL,
 } from '../../domain/models/experiment-config.model';
 export { DEFAULT_SLEEP_STATE_THRESHOLDS } from '../../domain/models/sleep-state.model';
 export { sleepStateFrom } from '../../domain/models/sleep-state.model';

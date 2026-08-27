@@ -26,6 +26,11 @@ export const DEFAULT_CASCADE_THRESHOLDS: CascadeThresholds = {
 	minReachRate: 0.1,
 };
 
+/** Patient Zero / Shock 対象へ与える初期 Sleep Debt（時間） */
+export const DEFAULT_INITIAL_SLEEP_DEBT_HOURS = 3;
+/** 交通量の基準値。1 で標準 */
+export const DEFAULT_TRAFFIC_LEVEL = 1;
+
 export interface ExperimentConfigParams {
 	seed: number;
 	population: number;
@@ -52,12 +57,26 @@ export interface ExperimentConfigParams {
 
 export const MAX_POPULATION = 500;
 export const MAX_DAYS = 14;
+/**
+ * 初期 Sleep Debt の上限（時間）。
+ * これ以上積むと初日から全員が Severe になり、伝播の起点が観測できない。
+ */
+export const MAX_INITIAL_SLEEP_DEBT_HOURS = 12;
+/**
+ * 交通量の上限。trafficLevel は事故確率へ比例して効くため、
+ * 上限が無いと運転する Agent が毎 Tick 事故を起こし Simulation が成立しない。
+ */
+export const MAX_TRAFFIC_LEVEL = 3;
 
 export type ExperimentConfigError =
 	| 'SEED_NOT_INTEGER'
 	| 'POPULATION_OUT_OF_RANGE'
 	| 'DAYS_OUT_OF_RANGE'
-	| 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE';
+	| 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE'
+	| 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE'
+	| 'TRAFFIC_LEVEL_OUT_OF_RANGE'
+	| 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING'
+	| 'CASCADE_THRESHOLDS_OUT_OF_RANGE';
 
 /**
  * 実験条件。比較実験ではこの中の Experimental Variable だけを変更し、
@@ -89,14 +108,63 @@ export class ExperimentConfig {
 		if (!Number.isInteger(params.seed)) {
 			return { success: false, error: 'SEED_NOT_INTEGER' };
 		}
-		if (params.population < 1 || params.population > MAX_POPULATION) {
+		if (
+			!Number.isInteger(params.population) ||
+			params.population < 1 ||
+			params.population > MAX_POPULATION
+		) {
 			return { success: false, error: 'POPULATION_OUT_OF_RANGE' };
 		}
-		if (params.days < 1 || params.days > MAX_DAYS) {
+		if (!Number.isInteger(params.days) || params.days < 1 || params.days > MAX_DAYS) {
 			return { success: false, error: 'DAYS_OUT_OF_RANGE' };
 		}
-		if (params.initialSleepDeprivedRate < 0 || params.initialSleepDeprivedRate > 1) {
+		// NaN は比較演算子がすべて false になり範囲判定をすり抜けるため、有限数であることから確かめる。
+		// すり抜けた NaN は Patient Zero の人数や事故確率へそのまま流れ、Run 全体が壊れる
+		if (
+			!Number.isFinite(params.initialSleepDeprivedRate) ||
+			params.initialSleepDeprivedRate < 0 ||
+			params.initialSleepDeprivedRate > 1
+		) {
 			return { success: false, error: 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE' };
+		}
+
+		const initialSleepDebtHours = params.initialSleepDebtHours ?? DEFAULT_INITIAL_SLEEP_DEBT_HOURS;
+		if (
+			!Number.isFinite(initialSleepDebtHours) ||
+			initialSleepDebtHours < 0 ||
+			initialSleepDebtHours > MAX_INITIAL_SLEEP_DEBT_HOURS
+		) {
+			return { success: false, error: 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE' };
+		}
+
+		const trafficLevel = params.trafficLevel ?? DEFAULT_TRAFFIC_LEVEL;
+		if (!Number.isFinite(trafficLevel) || trafficLevel <= 0 || trafficLevel > MAX_TRAFFIC_LEVEL) {
+			return { success: false, error: 'TRAFFIC_LEVEL_OUT_OF_RANGE' };
+		}
+
+		// sleepStateFrom は severe → sleepDeprived → tired の順に判定するため、
+		// 昇順が崩れると状態が飛び、Cascade Reach と Rs の集計がそのまま狂う
+		const { tired, sleepDeprived, severe } =
+			params.sleepStateThresholds ?? DEFAULT_SLEEP_STATE_THRESHOLDS;
+		// severe が有限なら、昇順が成り立つ時点で tired・sleepDeprived も有限になる
+		if (
+			!(tired > 0 && tired < sleepDeprived && sleepDeprived < severe && Number.isFinite(severe))
+		) {
+			return { success: false, error: 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING' };
+		}
+
+		// Cascade 成立の判定条件そのもの。ここが崩れると実験結果の解釈が変わる
+		const cascade = params.cascadeThresholds ?? DEFAULT_CASCADE_THRESHOLDS;
+		if (
+			!Number.isFinite(cascade.rsThreshold) ||
+			cascade.rsThreshold <= 0 ||
+			!Number.isInteger(cascade.minGenerations) ||
+			cascade.minGenerations < 1 ||
+			!Number.isFinite(cascade.minReachRate) ||
+			cascade.minReachRate < 0 ||
+			cascade.minReachRate > 1
+		) {
+			return { success: false, error: 'CASCADE_THRESHOLDS_OUT_OF_RANGE' };
 		}
 
 		return {
@@ -106,9 +174,9 @@ export class ExperimentConfig {
 				params.population,
 				params.days,
 				params.initialSleepDeprivedRate,
-				params.initialSleepDebtHours ?? 3,
+				initialSleepDebtHours,
 				params.shockTarget ?? 'none',
-				params.trafficLevel ?? 1,
+				trafficLevel,
 				params.intervention ?? null,
 				params.aiModel ?? null,
 				params.sleepStateThresholds ?? DEFAULT_SLEEP_STATE_THRESHOLDS,

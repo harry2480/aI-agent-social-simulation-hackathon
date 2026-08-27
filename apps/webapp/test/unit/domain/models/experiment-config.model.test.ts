@@ -83,6 +83,102 @@ describe('ExperimentConfig', () => {
 			},
 		);
 
+		it.each([1.5, 300.5])('population %s は整数でなければ弾く', (population) => {
+			expectError({ ...valid, population }, 'POPULATION_OUT_OF_RANGE');
+		});
+
+		it('days が整数でなければ弾く', () => {
+			expectError({ ...valid, days: 7.5 }, 'DAYS_OUT_OF_RANGE');
+		});
+
+		it.each([-1, 13])('初期 Sleep Debt %s は INITIAL_SLEEP_DEBT_OUT_OF_RANGE', (hours) => {
+			expectError({ ...valid, initialSleepDebtHours: hours }, 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE');
+		});
+
+		it.each([0, 12])('初期 Sleep Debt %s を受け入れる', (hours) => {
+			expect(
+				createTestConfig({ ...valid, initialSleepDebtHours: hours }).initialSleepDebtHours,
+			).toBe(hours);
+		});
+
+		it.each([0, -1, 3.1])('trafficLevel %s は TRAFFIC_LEVEL_OUT_OF_RANGE', (trafficLevel) => {
+			// 事故確率へ比例して効くため、上限が無いと毎 Tick 事故になり Simulation が成立しない
+			expectError({ ...valid, trafficLevel }, 'TRAFFIC_LEVEL_OUT_OF_RANGE');
+		});
+
+		it.each([0.1, 1, 3])('trafficLevel %s を受け入れる', (trafficLevel) => {
+			expect(createTestConfig({ ...valid, trafficLevel }).trafficLevel).toBe(trafficLevel);
+		});
+
+		it('睡眠状態の閾値が昇順でなければ SLEEP_STATE_THRESHOLDS_NOT_ASCENDING', () => {
+			// severe を飛び越えると sleepStateFrom が状態を飛ばし、Reach と Rs の集計が狂う
+			expectError(
+				{ ...valid, sleepStateThresholds: { tired: 1, sleepDeprived: 5, severe: 2 } },
+				'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING',
+			);
+		});
+
+		it('睡眠状態の閾値が 0 以下なら弾く', () => {
+			expectError(
+				{ ...valid, sleepStateThresholds: { tired: 0, sleepDeprived: 1, severe: 2 } },
+				'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING',
+			);
+		});
+
+		it.each([
+			{ rsThreshold: 0, minGenerations: 2, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: 0, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: 1.5, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: 2, minReachRate: 1.1 },
+		])('Cascade 判定 %o は CASCADE_THRESHOLDS_OUT_OF_RANGE', (cascadeThresholds) => {
+			expectError({ ...valid, cascadeThresholds }, 'CASCADE_THRESHOLDS_OUT_OF_RANGE');
+		});
+
+		// NaN は比較演算子がすべて false になるため、範囲判定だけでは素通りする
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'初期睡眠不足率 %s は INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+			(initialSleepDeprivedRate) => {
+				expectError(
+					{ ...valid, initialSleepDeprivedRate },
+					'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE',
+				);
+			},
+		);
+
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'初期 Sleep Debt %s は INITIAL_SLEEP_DEBT_OUT_OF_RANGE',
+			(initialSleepDebtHours) => {
+				expectError({ ...valid, initialSleepDebtHours }, 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE');
+			},
+		);
+
+		it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+			'trafficLevel %s は TRAFFIC_LEVEL_OUT_OF_RANGE',
+			(trafficLevel) => {
+				expectError({ ...valid, trafficLevel }, 'TRAFFIC_LEVEL_OUT_OF_RANGE');
+			},
+		);
+
+		it.each([
+			{ tired: Number.NaN, sleepDeprived: 1, severe: 2 },
+			{ tired: 1, sleepDeprived: Number.NaN, severe: 2 },
+			{ tired: 1, sleepDeprived: 2, severe: Number.NaN },
+			{ tired: 1, sleepDeprived: 2, severe: Number.POSITIVE_INFINITY },
+		])('睡眠状態の閾値 %o は SLEEP_STATE_THRESHOLDS_NOT_ASCENDING', (sleepStateThresholds) => {
+			expectError({ ...valid, sleepStateThresholds }, 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING');
+		});
+
+		it.each([
+			{ rsThreshold: Number.NaN, minGenerations: 2, minReachRate: 0.1 },
+			{ rsThreshold: Number.POSITIVE_INFINITY, minGenerations: 2, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: Number.NaN, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: Number.POSITIVE_INFINITY, minReachRate: 0.1 },
+			{ rsThreshold: 1, minGenerations: 2, minReachRate: Number.NaN },
+			{ rsThreshold: 1, minGenerations: 2, minReachRate: Number.NEGATIVE_INFINITY },
+		])('Cascade 判定 %o は CASCADE_THRESHOLDS_OUT_OF_RANGE', (cascadeThresholds) => {
+			expectError({ ...valid, cascadeThresholds }, 'CASCADE_THRESHOLDS_OUT_OF_RANGE');
+		});
+
 		it('閾値を上書きできる', () => {
 			const thresholds = { tired: 0.5, sleepDeprived: 1, severe: 2 };
 			expect(

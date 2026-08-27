@@ -2,10 +2,14 @@ import {
 	type CascadeThresholds,
 	DEFAULT_CASCADE_THRESHOLDS,
 	DEFAULT_SLEEP_STATE_THRESHOLDS,
+	ExperimentConfig,
+	type ExperimentConfigError,
 	type ExperimentConfigParams,
 	type InterventionName,
 	MAX_DAYS,
+	MAX_INITIAL_SLEEP_DEBT_HOURS,
 	MAX_POPULATION,
+	MAX_TRAFFIC_LEVEL,
 	type ShockTarget,
 	type SleepStateThresholds,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
@@ -49,62 +53,19 @@ export const DEFAULT_EXPERIMENT_SETTINGS: ExperimentSettings = {
 const EXPERIMENT_SETTINGS_STORAGE_KEY = 'sleep-city.experiment-settings';
 
 /** 設定値の検証エラー。画面はこれをメッセージへ変換して表示する */
-export type SettingsError =
-	| 'SEED_NOT_INTEGER'
-	| 'POPULATION_OUT_OF_RANGE'
-	| 'DAYS_OUT_OF_RANGE'
-	| 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE'
-	| 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE'
-	| 'TRAFFIC_LEVEL_OUT_OF_RANGE'
-	| 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING'
-	| 'CASCADE_THRESHOLDS_OUT_OF_RANGE';
+export type SettingsError = ExperimentConfigError;
 
 /**
  * 設定値を検証する。
- * ExperimentConfig.create と同じ範囲に加え、画面でしか変更できない閾値も確認する。
- * 不正な設定を保存すると、次に Run を開始した時点で初めて失敗して原因が分かりにくい。
+ *
+ * 判定は ExperimentConfig.create に委ねる。画面のほうが domain より厳しい状態になると、
+ * 画面を通らない経路（API / スクリプト）だけ不正な条件で走ってしまうため、
+ * 範囲の定義は domain に一本化する。
+ * ここで先に見るのは、不正な設定を保存して次の Run 開始時に初めて失敗するのを防ぐため。
  */
 export function validateSettings(settings: ExperimentSettings): SettingsError | null {
-	if (!Number.isInteger(settings.seed)) {
-		return 'SEED_NOT_INTEGER';
-	}
-	if (
-		!Number.isInteger(settings.population) ||
-		settings.population < 1 ||
-		settings.population > MAX_POPULATION
-	) {
-		return 'POPULATION_OUT_OF_RANGE';
-	}
-	if (!Number.isInteger(settings.days) || settings.days < 1 || settings.days > MAX_DAYS) {
-		return 'DAYS_OUT_OF_RANGE';
-	}
-	if (settings.initialSleepDeprivedRate < 0 || settings.initialSleepDeprivedRate > 1) {
-		return 'INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE';
-	}
-	if (settings.initialSleepDebtHours < 0 || settings.initialSleepDebtHours > 12) {
-		return 'INITIAL_SLEEP_DEBT_OUT_OF_RANGE';
-	}
-	if (settings.trafficLevel <= 0 || settings.trafficLevel > 3) {
-		return 'TRAFFIC_LEVEL_OUT_OF_RANGE';
-	}
-
-	const { tired, sleepDeprived, severe } = settings.sleepStateThresholds;
-	if (!(tired > 0 && tired < sleepDeprived && sleepDeprived < severe)) {
-		return 'SLEEP_STATE_THRESHOLDS_NOT_ASCENDING';
-	}
-
-	const cascade = settings.cascadeThresholds;
-	if (
-		cascade.rsThreshold <= 0 ||
-		!Number.isInteger(cascade.minGenerations) ||
-		cascade.minGenerations < 1 ||
-		cascade.minReachRate < 0 ||
-		cascade.minReachRate > 1
-	) {
-		return 'CASCADE_THRESHOLDS_OUT_OF_RANGE';
-	}
-
-	return null;
+	const result = ExperimentConfig.create(toExperimentConfigParams(settings));
+	return result.success ? null : result.error;
 }
 
 export const SETTINGS_ERROR_MESSAGES: Record<SettingsError, string> = {
@@ -112,8 +73,8 @@ export const SETTINGS_ERROR_MESSAGES: Record<SettingsError, string> = {
 	POPULATION_OUT_OF_RANGE: `Population は 1〜${MAX_POPULATION} の整数で入力してください。`,
 	DAYS_OUT_OF_RANGE: `Days は 1〜${MAX_DAYS} の整数で入力してください。`,
 	INITIAL_SLEEP_DEPRIVED_RATE_OUT_OF_RANGE: '初期睡眠不足率は 0〜1 で入力してください。',
-	INITIAL_SLEEP_DEBT_OUT_OF_RANGE: '初期 Sleep Debt は 0〜12 時間で入力してください。',
-	TRAFFIC_LEVEL_OUT_OF_RANGE: 'Traffic Level は 0 より大きく 3 以下で入力してください。',
+	INITIAL_SLEEP_DEBT_OUT_OF_RANGE: `初期 Sleep Debt は 0〜${MAX_INITIAL_SLEEP_DEBT_HOURS} 時間で入力してください。`,
+	TRAFFIC_LEVEL_OUT_OF_RANGE: `Traffic Level は 0 より大きく ${MAX_TRAFFIC_LEVEL} 以下で入力してください。`,
 	SLEEP_STATE_THRESHOLDS_NOT_ASCENDING:
 		'睡眠状態の閾値は Tired < Sleep Deprived < Severe の順に大きくしてください。',
 	CASCADE_THRESHOLDS_OUT_OF_RANGE:
