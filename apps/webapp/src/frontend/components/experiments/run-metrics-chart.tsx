@@ -18,8 +18,11 @@ interface RunMetricsChartProps {
 }
 
 /**
- * Run の KPI 時系列（要件定義 25・36 章）。
- * Sleep-Deprived Population と Rs はスケールが 2 桁以上違うため軸を分ける。
+ * Run の KPI 時系列（要件定義 25・39 章）。
+ *
+ * 人数・Rs・Sleep Debt はスケールが 2 桁以上違うため軸を分ける。
+ * Sleep Debt は Population ぶんの合計で人数の 10 倍まで伸びるため、
+ * 人数と同じ軸に載せると人数の変化が潰れて読めない。
  */
 export function RunMetricsChart({ metrics }: RunMetricsChartProps) {
 	if (metrics.length === 0) {
@@ -44,6 +47,12 @@ export function RunMetricsChart({ metrics }: RunMetricsChartProps) {
 					<YAxis yAxisId="count" tick={{ fontSize: 10 }} stroke="var(--color-muted-foreground)" />
 					<YAxis
 						yAxisId="rate"
+						orientation="right"
+						tick={{ fontSize: 10 }}
+						stroke="var(--color-muted-foreground)"
+					/>
+					<YAxis
+						yAxisId="debt"
 						orientation="right"
 						tick={{ fontSize: 10 }}
 						stroke="var(--color-muted-foreground)"
@@ -88,6 +97,14 @@ export function RunMetricsChart({ metrics }: RunMetricsChartProps) {
 						stroke="var(--color-primary)"
 						dot={false}
 						strokeDasharray="4 2"
+					/>
+					<Line
+						yAxisId="debt"
+						type="monotone"
+						dataKey="sleepDebt"
+						name="Sleep Debt (h)"
+						stroke="var(--color-sleep-tired)"
+						dot={false}
 					/>
 				</LineChart>
 			</ResponsiveContainer>
