@@ -58,6 +58,8 @@ describe('networkOfEventType', () => {
 		['late_arrival', 'transportation'],
 		['work_failure', 'work'],
 		['overtime', 'work'],
+		['delivery_delay', 'logistics'],
+		['store_delay', 'logistics'],
 		['household_delay', 'household'],
 	] as const)('%s は %s Network', (type, network) => {
 		expect(networkOfEventType(type)).toBe(network);
@@ -174,6 +176,41 @@ describe('CascadeService.networksTraversedFrom', () => {
 		addTransmission(state, 'a', 'b', false, loss.id);
 
 		expect(service.networksTraversedFrom(state, 'a')).toEqual(['transportation']);
+	});
+
+	it('物流の連鎖を Work Network と別に数える', () => {
+		// 遅配とその先の店舗業務の遅れは職場の上下関係ではなく物流で伝わる。
+		// 同じ Network に混ぜると Cross-network Spread が横断の実態より小さく出る
+		const state = buildState();
+		const delivery = state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 1,
+				type: 'delivery_delay',
+				actorId: 'a',
+			}),
+		);
+		const overtime = state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 2,
+				type: 'overtime',
+				actorId: 'b',
+				causes: [delivery],
+			}),
+		);
+		const loss = state.recordEvent(
+			SimulationEvent.create({
+				id: state.nextEventId(),
+				tick: 3,
+				type: 'sleep_opportunity_loss',
+				actorId: 'b',
+				causes: [overtime],
+			}),
+		);
+		addTransmission(state, 'a', 'b', false, loss.id);
+
+		expect(service.networksTraversedFrom(state, 'a')).toEqual(['logistics', 'work']);
 	});
 
 	it('伝播が無ければ空配列', () => {
