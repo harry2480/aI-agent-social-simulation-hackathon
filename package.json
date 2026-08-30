@@ -28,7 +28,7 @@
 		"knip": "^6.32.2",
 		"simple-git-hooks": "^2.13.1",
 		"supabase": "^2.115.0",
-		"vercel": "^50.33.1"
+		"vercel": "^59.7.0"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [
