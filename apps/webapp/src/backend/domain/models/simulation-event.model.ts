@@ -77,6 +77,16 @@ export function originOfEventType(type: EventType): EventOrigin {
 	return ORIGIN_BY_EVENT_TYPE[type] ?? 'deterministic';
 }
 
+/**
+ * その Event を生んだ AI の判断（要件定義 38 章）。
+ * decision Event にだけ入る。確率抽選や計算で決まった Event では undefined。
+ */
+export interface EventDecision {
+	action: string;
+	reason: string;
+	model: string;
+}
+
 export interface EventImpact {
 	delayMinutes?: number;
 	sleepLossMinutes?: number;
@@ -90,7 +100,8 @@ export interface EventImpact {
  * decision は毎日ほぼ全 Agent で発生するため含めない。
  * 含めると Timeline が Decision で埋まって事故・遅延・伝播が見えなくなり、
  * 保存件数も Population × Days のオーダーで膨らむ。
- * AI の判断内容は Agent Detail の Last AI Decision と agent_decisions テーブルで参照する。
+ * AI の判断内容は Agent Detail の Last AI Decision と agent_decisions テーブル、
+ * および Watch Mode の Causal Graph（Event が持つ decision）で参照する。
  */
 const SIGNIFICANT_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
 	'accident',
@@ -125,6 +136,8 @@ export class SimulationEvent {
 		public readonly impact: EventImpact,
 		/** 因果チェーン上の深さ。Patient Zero 起点の Event が 0 */
 		public readonly depth: number,
+		/** AI が選んだ行動とその理由。decision Event 以外では undefined */
+		public readonly decision: EventDecision | undefined,
 	) {}
 
 	static create(params: {
@@ -135,6 +148,7 @@ export class SimulationEvent {
 		targetIds?: readonly string[];
 		causes?: readonly SimulationEvent[];
 		impact?: EventImpact;
+		decision?: EventDecision;
 	}): SimulationEvent {
 		const causes = params.causes ?? [];
 		const depth = causes.length === 0 ? 0 : Math.max(...causes.map((cause) => cause.depth)) + 1;
@@ -148,6 +162,7 @@ export class SimulationEvent {
 			causes.map((cause) => cause.id),
 			params.impact ?? {},
 			depth,
+			params.decision,
 		);
 	}
 
@@ -160,6 +175,7 @@ export class SimulationEvent {
 		causedByEventIds: readonly string[];
 		impact: EventImpact;
 		depth: number;
+		decision?: EventDecision;
 	}): SimulationEvent {
 		return new SimulationEvent(
 			params.id,
@@ -170,6 +186,7 @@ export class SimulationEvent {
 			params.causedByEventIds,
 			params.impact,
 			params.depth,
+			params.decision,
 		);
 	}
 

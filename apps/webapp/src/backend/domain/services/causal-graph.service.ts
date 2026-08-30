@@ -1,4 +1,4 @@
-import type { EventType, SimulationEvent } from '../models/simulation-event.model';
+import type { EventDecision, EventType, SimulationEvent } from '../models/simulation-event.model';
 import type { SimulationState } from '../models/simulation-state.model';
 
 export interface CausalGraphNode {
@@ -9,6 +9,10 @@ export interface CausalGraphNode {
 	depth: number;
 	delayMinutes: number | undefined;
 	sleepLossMinutes: number | undefined;
+	fatigueDelta: number | undefined;
+	stressDelta: number | undefined;
+	/** AI が選んだ行動とその理由。decision Event 以外では undefined（要件定義 38 章） */
+	decision: EventDecision | undefined;
 	/** 起点 Event からの距離。負が祖先、正が子孫、0 が起点 */
 	distanceFromFocus: number;
 }
@@ -105,6 +109,9 @@ export class CausalGraphService {
 				depth: event.depth,
 				delayMinutes: event.impact.delayMinutes,
 				sleepLossMinutes: event.impact.sleepLossMinutes,
+				fatigueDelta: event.impact.fatigueDelta,
+				stressDelta: event.impact.stressDelta,
+				decision: event.decision,
 				distanceFromFocus: distance,
 			});
 		}
