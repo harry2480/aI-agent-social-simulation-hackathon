@@ -11,7 +11,7 @@ import {
 	batchExperimentConfig,
 	batchExperimentName,
 } from '@/frontend/lib/experiment-batch';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type BatchStatus = 'idle' | 'running' | 'saving' | 'done' | 'error';
 
@@ -41,6 +41,9 @@ export function useExperimentBatch(databaseConfigured: boolean) {
 	const cancel = useCallback(() => {
 		cancelledRef.current = true;
 	}, []);
+
+	// 画面を離れても Run はメインスレッドで回り続けるため、アンマウントで中止する
+	useEffect(() => cancel, [cancel]);
 
 	const run = useCallback(
 		async (plan: BatchPlan) => {

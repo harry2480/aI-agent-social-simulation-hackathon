@@ -36,6 +36,10 @@ export interface RunExperimentParams {
 	seeds: number;
 	/** 基準条件。Experimental Variable 以外はここで固定する（要件定義 28 章） */
 	base?: ExperimentConfigParams;
+	/**
+	 * Run が 1 本終わるたびに呼ぶ。ブラウザ実行はここで描画へ制御を返す。
+	 * 中止もこの境界でしか効かない（1 Run の途中では止まらない）。
+	 */
 	onProgress?: (progress: BatchProgress) => void | Promise<void>;
 	/**
 	 * Run 1 本が終わるたびに呼ぶ。Run 単位（Agent / Event / Metrics）の保存に使う。

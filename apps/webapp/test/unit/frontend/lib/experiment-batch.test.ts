@@ -1,3 +1,4 @@
+import { isBatchExperimentSnapshot } from '@/backend/presentation/composition/simulation.composition';
 import {
 	MAX_DAYS,
 	MAX_POPULATION,
@@ -37,6 +38,12 @@ describe('parseBatchForm', () => {
 
 	it('判定だけを振る実験の Run 数は Seed 数のまま', () => {
 		expect(planOf({ kind: 'cascade-threshold', seeds: 3 }).totalRuns).toBe(3);
+	});
+
+	it('Run を共有する実験かどうかを持つ', () => {
+		// 見積もりの書き方が変わる（条件 × Seed の等式が成り立たない）
+		expect(planOf({ kind: 'cascade-threshold' }).sharesRuns).toBe(true);
+		expect(planOf({ kind: 'shock-comparison' }).sharesRuns).toBe(false);
 	});
 
 	it('フォームの Population と Days を base へ反映する', () => {
@@ -87,6 +94,15 @@ describe('batchExperimentName', () => {
 });
 
 describe('batchExperimentConfig', () => {
+	it('保存側の検証を通る形で作る', () => {
+		// ここがずれると、実行できたのに保存だけ弾かれる
+		for (const kind of ['shock-comparison', 'critical-point', 'cascade-threshold'] as const) {
+			expect(
+				isBatchExperimentSnapshot(batchExperimentConfig(planOf({ kind, seeds: MAX_BATCH_SEEDS }))),
+			).toBe(true);
+		}
+	});
+
 	it('何を固定して何を振ったかを条件スナップショットへ残す', () => {
 		const config = batchExperimentConfig(planOf({ kind: 'intervention', seeds: 2 }));
 

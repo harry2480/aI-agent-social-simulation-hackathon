@@ -2,6 +2,7 @@ import {
 	aggregateSummaries,
 	averageDampingGeneration,
 	isConditionAggregate,
+	normalizeConditionAggregate,
 	standardDeviation,
 } from '@/backend/domain/models/experiment-aggregate.model';
 import type { RunSummary } from '@/backend/domain/models/metrics.model';
@@ -187,5 +188,25 @@ describe('isConditionAggregate', () => {
 	it('オブジェクト以外を弾く', () => {
 		expect(isConditionAggregate(null)).toBe(false);
 		expect(isConditionAggregate('driver-shock')).toBe(false);
+	});
+});
+
+describe('normalizeConditionAggregate', () => {
+	it('検証済みのキーだけを写す', () => {
+		// 呼び出し側が付けた項目をそのまま保存すると aggregate_json が汚れる
+		const aggregate = aggregateSummaries('driver-shock', [summary()]);
+		const normalized = normalizeConditionAggregate({
+			...aggregate,
+			injected: 'x',
+		} as typeof aggregate);
+
+		expect(normalized).toEqual(aggregate);
+		expect('injected' in normalized).toBe(false);
+	});
+
+	it('長すぎるラベルを切り詰める', () => {
+		const aggregate = aggregateSummaries('a'.repeat(200), [summary()]);
+
+		expect(normalizeConditionAggregate(aggregate).label).toHaveLength(120);
 	});
 });

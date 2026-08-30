@@ -1,3 +1,4 @@
+import { MAX_CONDITION_LABEL_LENGTH } from './experiment-plan.model';
 import type { RunSummary } from './metrics.model';
 
 /**
@@ -141,4 +142,31 @@ export function isConditionAggregate(value: unknown): value is ConditionAggregat
 		'averageCommuteDelayMinutes',
 	];
 	return numericKeys.every((key) => isFiniteNumber(candidate[key]));
+}
+
+/**
+ * 検証を通った集計から、保存してよい項目だけを組み立て直す。
+ *
+ * 型ガードは必須キーの有無しか見ないため、そのまま保存すると
+ * 呼び出し側が付けた任意のキーが `aggregate_json` へ入る。
+ * ここで既知のキーだけを写し、ラベルの長さも切り詰める。
+ */
+export function normalizeConditionAggregate(aggregate: ConditionAggregate): ConditionAggregate {
+	return {
+		label: aggregate.label.slice(0, MAX_CONDITION_LABEL_LENGTH),
+		runCount: aggregate.runCount,
+		cascadeProbability: aggregate.cascadeProbability,
+		outbreakProbability: aggregate.outbreakProbability,
+		averageDampingGeneration: aggregate.averageDampingGeneration,
+		averageRs: aggregate.averageRs,
+		peakRs: aggregate.peakRs,
+		averageReach: aggregate.averageReach,
+		totalSleepLossMinutes: aggregate.totalSleepLossMinutes,
+		standardDeviation: aggregate.standardDeviation,
+		averageSleepDebtHours: aggregate.averageSleepDebtHours,
+		averageCascadeDepth: aggregate.averageCascadeDepth,
+		averageAccidentCount: aggregate.averageAccidentCount,
+		averageOvertimeHours: aggregate.averageOvertimeHours,
+		averageCommuteDelayMinutes: aggregate.averageCommuteDelayMinutes,
+	};
 }

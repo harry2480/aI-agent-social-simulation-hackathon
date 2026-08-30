@@ -120,7 +120,8 @@ export function ExperimentRunner({ databaseConfigured }: ExperimentRunnerProps) 
 					>
 						{busy ? '実行中…' : '実行する'}
 					</Button>
-					{busy ? (
+					{/* 保存は途中で止められないため、Run を回している間だけ出す */}
+					{status === 'running' ? (
 						<Button size="sm" variant="outline" onClick={cancel}>
 							中止
 						</Button>
@@ -129,10 +130,10 @@ export function ExperimentRunner({ databaseConfigured }: ExperimentRunnerProps) 
 						<span className="text-xs text-destructive">{formError}</span>
 					) : plan !== null && !busy ? (
 						<span className="text-xs text-muted-foreground">
-							{plan.conditionCount} 条件 × {plan.seeds} Seed = Run {plan.totalRuns} 本
-							{plan.kind === 'cascade-threshold'
-								? '（同じ Run を判定条件だけ変えて数え直します）'
-								: ''}
+							{/* 判定を振る実験は Run を共有するため、条件 × Seed の等式が成り立たない */}
+							{plan.sharesRuns
+								? `Run ${plan.totalRuns} 本（${plan.conditionCount} 通りの判定条件で数え直します）`
+								: `${plan.conditionCount} 条件 × ${plan.seeds} Seed = Run ${plan.totalRuns} 本`}
 						</span>
 					) : null}
 				</div>

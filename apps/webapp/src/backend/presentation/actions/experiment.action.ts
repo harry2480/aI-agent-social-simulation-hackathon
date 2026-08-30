@@ -3,9 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import {
 	type ConditionAggregate,
+	MAX_BROWSER_BATCH_SEEDS,
+	MAX_SNAPSHOT_CONDITIONS,
 	experimentRepository,
 	isBatchExperimentKind,
+	isBatchExperimentSnapshot,
 	isConditionAggregate,
+	isDatabaseConfigured,
+	normalizeConditionAggregate,
 } from '../composition/simulation.composition';
 
 export interface CreateExperimentInput {
@@ -35,6 +40,13 @@ export async function createExperimentAction(
 	return { experimentId };
 }
 
+/**
+ * 実験名の上限。一覧に並ぶ 1 行分で足りる。
+ * Server Action は誰でも呼べるため、際限のない長さがそのまま DB へ入らないようにする。
+ * 集計の件数は条件の件数と同じものなので、domain の上限（MAX_SNAPSHOT_CONDITIONS）に合わせる。
+ */
+const MAX_EXPERIMENT_NAME_LENGTH = 200;
+
 export interface SaveExperimentInput {
 	name: string;
 	kind: string;
@@ -57,20 +69,41 @@ export interface SaveExperimentInput {
 export async function saveExperimentAction(
 	input: SaveExperimentInput,
 ): Promise<{ experimentId: string }> {
-	if (input.name.trim().length === 0) {
+	// DB 未設定の判定はクライアント側にもあるが、Action は直接呼べるためここでも確かめる。
+	// 通らないと Prisma の接続エラーがそのまま画面へ出る（API Route の 503 と同じ扱いにする）
+	if (!isDatabaseConfigured()) {
+		throw new Error('database is not configured');
+	}
+	// Server Action は型の保証が無いまま呼ばれうるため、name の型から確かめる。
+	// 文字列を前提に trim すると、形の違う入力が検証エラーではなく TypeError になる
+	if (typeof input !== 'object' || input === null) {
+		throw new Error('保存する内容がありません');
+	}
+	if (typeof input.name !== 'string' || input.name.trim().length === 0) {
 		throw new Error('実験名を入力してください');
+	}
+	if (input.name.length > MAX_EXPERIMENT_NAME_LENGTH) {
+		throw new Error(`実験名は ${MAX_EXPERIMENT_NAME_LENGTH} 文字以内にしてください`);
 	}
 	if (!isBatchExperimentKind(input.kind)) {
 		throw new Error(`unknown experiment kind: ${input.kind}`);
 	}
+	// 条件スナップショットを素通しにすると、任意の JSON がそのまま config_json へ入る
+	if (!isBatchExperimentSnapshot(input.config)) {
+		throw new Error('実験条件の形式が不正です');
+	}
 	if (!Array.isArray(input.results) || input.results.length === 0) {
 		throw new Error('保存する集計がありません');
 	}
+	if (input.results.length > MAX_SNAPSHOT_CONDITIONS) {
+		throw new Error(`条件は ${MAX_SNAPSHOT_CONDITIONS} 件までです`);
+	}
 	const results: ConditionAggregate[] = input.results.map((result) => {
-		if (!isConditionAggregate(result)) {
+		if (!isConditionAggregate(result) || result.runCount > MAX_BROWSER_BATCH_SEEDS) {
 			throw new Error('集計の形式が不正です');
 		}
-		return result;
+		// 検証済みのキーだけを写す。呼び出し側が付けた項目を保存しないため
+		return normalizeConditionAggregate(result);
 	});
 
 	const experimentId = await experimentRepository.create({

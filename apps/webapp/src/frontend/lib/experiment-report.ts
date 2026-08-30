@@ -2,6 +2,7 @@ import type {
 	ExperimentAggregate,
 	StoredRun,
 } from '@/backend/presentation/composition/simulation.composition';
+import { isJudgementExperimentKind } from '@/backend/presentation/composition/simulation.composition';
 import {
 	type ComparisonRow,
 	describeRunCondition,
@@ -41,6 +42,13 @@ function formatNumber(value: number, digits = 1): string {
 export function buildExperimentReport(params: {
 	results: readonly ExperimentAggregate[];
 	runs: readonly StoredRun[];
+	/**
+	 * 実験の種別。判定条件だけを振った実験は同じ Run を数え直しているため、
+	 * 条件間の Reach や副作用に差が出ない。差が無いものを差として語らないために使う
+	 */
+	kind?: string;
+	/** 保存時の条件スナップショット。Run が保存されない理由を実行経路から説明するために使う */
+	config?: unknown;
 }): ExperimentReport {
 	const rows = toComparisonRows(params.results);
 	if (rows.length === 0) {
@@ -54,23 +62,31 @@ export function buildExperimentReport(params: {
 	const findings: string[] = [];
 	const cautions: string[] = [];
 
+	// 判定条件だけを振った実験は Run を共有するため、Reach の大小比較に意味が無い
+	const judgement = params.kind !== undefined && isJudgementExperimentKind(params.kind);
+
 	const sortedByReach = [...rows].sort((a, b) => b.averageReach - a.averageReach);
 	const worst = sortedByReach[0];
 	const best = sortedByReach[sortedByReach.length - 1];
 
 	const headline =
-		worst === undefined || best === undefined || worst.label === best.label
-			? `${rows.length} 条件を比較しました。`
+		judgement || worst === undefined || best === undefined || worst.label === best.label
+			? judgementHeadline(rows, judgement)
 			: `Cascade Reach が最大だったのは ${worst.label}（平均 ${formatNumber(worst.averageReach)}）、最小は ${best.label}（平均 ${formatNumber(best.averageReach)}）です。`;
 
-	for (const row of rows) {
-		if (row.reachDeltaVsControl === null) {
-			continue;
+	if (judgement) {
+		findings.push(...summarizeJudgement(rows));
+	} else {
+		for (const row of rows) {
+			// 差が 0 の条件を「0.0 人分 抑制しました」と書くと、差があるように読める
+			if (row.reachDeltaVsControl === null || row.reachDeltaVsControl === 0) {
+				continue;
+			}
+			const direction = row.reachDeltaVsControl > 0 ? '拡大' : '抑制';
+			findings.push(
+				`${row.label} は対照条件に対して Cascade Reach を ${formatNumber(Math.abs(row.reachDeltaVsControl))} 人分 ${direction}しました（Cascade 発生率 ${formatPercent(row.cascadeProbability)}）。`,
+			);
 		}
-		const direction = row.reachDeltaVsControl > 0 ? '拡大' : '抑制';
-		findings.push(
-			`${row.label} は対照条件に対して Cascade Reach を ${formatNumber(Math.abs(row.reachDeltaVsControl))} 人分 ${direction}しました（Cascade 発生率 ${formatPercent(row.cascadeProbability)}）。`,
-		);
 	}
 
 	findings.push(...summarizeOutbreakShape(rows));
@@ -78,7 +94,10 @@ export function buildExperimentReport(params: {
 	const selfReplicating = rows.filter((row) => row.peakRs > SELF_REPLICATION_RS);
 	if (selfReplicating.length > 0) {
 		findings.push(
-			`Peak Rs が 1 を超えた条件: ${selfReplicating.map((row) => `${row.label}（${formatNumber(row.peakRs, 2)}）`).join('、')}。この条件では睡眠不足が自己増殖しています。`,
+			// 判定を振った実験は全条件が同じ Run なので、条件を並べても同じ値が続くだけ
+			judgement
+				? `Peak Rs は ${formatNumber(selfReplicating[0]?.peakRs ?? 0, 2)} で 1 を超えており、睡眠不足が自己増殖しています。`
+				: `Peak Rs が 1 を超えた条件: ${selfReplicating.map((row) => `${row.label}（${formatNumber(row.peakRs, 2)}）`).join('、')}。この条件では睡眠不足が自己増殖しています。`,
 		);
 	} else {
 		findings.push('どの条件でも Peak Rs は 1 以下で、自己増殖には至っていません。');
@@ -95,8 +114,11 @@ export function buildExperimentReport(params: {
 	const sideEffects = summarizeSideEffects(params.runs);
 	findings.push(...sideEffects);
 	if (params.runs.length === 0) {
+		// ブラウザ実行は設計上 Run 単位を保存しないため、原因を実行経路から説明する
 		cautions.push(
-			'Run が保存されていないため、事故件数・残業時間などの副作用は比較できません（Batch Runner を --save-runs=false で実行した場合に起こります）。',
+			isBrowserExecuted(params.config)
+				? 'ブラウザ実行は条件ごとの集計だけを保存するため、事故件数・残業時間などの副作用は比較できません（scripts/run-experiment.ts で実行すると Run 単位も保存されます）。'
+				: 'Run が保存されていないため、事故件数・残業時間などの副作用は比較できません（Batch Runner を --save-runs=false で実行した場合に起こります）。',
 		);
 	}
 
@@ -162,4 +184,54 @@ function summarizeSideEffects(runs: readonly StoredRun[]): string[] {
 		);
 	}
 	return findings;
+}
+
+/** 条件間に差が無いときの見出し。判定を振った実験は発生率の幅を示す */
+function judgementHeadline(rows: readonly ComparisonRow[], judgement: boolean): string {
+	if (!judgement) {
+		return `${rows.length} 条件を比較しました。`;
+	}
+	const probabilities = rows.map((row) => row.cascadeProbability);
+	return `同じ Run を ${rows.length} 通りの判定条件で数え直しました。Cascade 発生率は ${formatPercent(
+		Math.min(...probabilities),
+	)}〜${formatPercent(Math.max(...probabilities))} に分かれます。`;
+}
+
+/**
+ * 判定条件ごとの Cascade 発生率を並べる（要件定義 24 章の感度分析）。
+ *
+ * Reach・Rs・副作用はどの条件も同じ Run なので比較しても差が出ない。
+ * 読む価値があるのは「どの判定なら Cascade と呼べるか」だけ。
+ * 条件は experimentPlanOf が厳しい順に並べるため、成立した先頭が境界になる。
+ */
+function summarizeJudgement(rows: readonly ComparisonRow[]): string[] {
+	const findings = [
+		`判定条件ごとの Cascade 発生率: ${rows
+			.map((row) => `${row.label}（${formatPercent(row.cascadeProbability)}）`)
+			.join('、')}。`,
+		'同じ Run を判定条件だけ変えて数え直しているため、Reach・Rs・副作用はどの条件でも同じ値になります。',
+	];
+
+	const detected = rows.filter((row) => row.cascadeProbability > 0);
+	if (detected.length === 0) {
+		findings.push(
+			'どの判定条件でも Cascade は成立しませんでした。判定をさらに緩める余地があります。',
+		);
+		return findings;
+	}
+	const loosest = detected[0];
+	if (loosest !== undefined) {
+		findings.push(
+			`最も厳しい側で Cascade が成立したのは ${loosest.label}（${formatPercent(loosest.cascadeProbability)}）です。ここより厳しい判定では 0% になります。`,
+		);
+	}
+	return findings;
+}
+
+/** ブラウザ実行で保存された実験か。条件スナップショットの executedIn で見分ける */
+function isBrowserExecuted(config: unknown): boolean {
+	if (typeof config !== 'object' || config === null) {
+		return false;
+	}
+	return (config as { executedIn?: unknown }).executedIn === 'browser';
 }

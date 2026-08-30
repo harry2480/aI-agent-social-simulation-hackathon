@@ -1,5 +1,5 @@
 import type { CascadeThresholds, ExperimentConfigParams } from './experiment-config.model';
-import { DEFAULT_CASCADE_THRESHOLDS } from './experiment-config.model';
+import { DEFAULT_CASCADE_THRESHOLDS, ExperimentConfig } from './experiment-config.model';
 
 /**
  * Batch 実行できる実験の種別。
@@ -126,8 +126,80 @@ export function experimentPlanOf(kind: BatchExperimentKind): ExperimentPlan {
 	}
 }
 
+/**
+ * 判定条件だけを振る実験か。
+ * この実験は同じ Run を数え直すため、条件間で Reach や副作用に差が出ない。
+ * 画面はこの区別を使って、差が無いものを差として語らないようにする。
+ */
+export function isJudgementExperimentKind(kind: string): boolean {
+	return isBatchExperimentKind(kind) && experimentPlanOf(kind).mode === 'judgement';
+}
+
 /** 実行する Run の総数。進捗表示と実行前の見積もりに使う */
 export function totalRunCount(plan: ExperimentPlan, seeds: number): number {
 	// judgement は同じ Run を判定だけ変えて数え直すため、Run 数は Seed 数のまま増えない
 	return plan.mode === 'judgement' ? seeds : plan.conditions.length * seeds;
+}
+
+/**
+ * ブラウザ実行で許す Seed 数の上限。
+ * Run はメインスレッドで回るため、上限が無いと 1 回の実行が数分単位で伸びる。
+ * それ以上の規模は `scripts/run-experiment.ts` の担当（要件定義 40 章）。
+ */
+export const MAX_BROWSER_BATCH_SEEDS = 20;
+
+/** 条件ラベルの最大数。保存を受け付ける集計の件数もこの値で揃える */
+export const MAX_SNAPSHOT_CONDITIONS = 64;
+/** 条件ラベルの最大長。比較表の 1 行に収まる長さで足りる */
+export const MAX_CONDITION_LABEL_LENGTH = 120;
+
+/**
+ * ブラウザ実行が保存する条件スナップショット。
+ * 後から「何を固定して何を振ったか」を読めるようにするために残す。
+ */
+export interface BatchExperimentSnapshot {
+	base: ExperimentConfigParams;
+	seeds: number;
+	conditions: string[];
+	executedIn: 'browser';
+}
+
+/**
+ * 保存してよい条件スナップショットかを判定する。
+ *
+ * Server Action は誰でも呼べるため、`config` を素通しにすると任意の JSON が
+ * そのまま `experiments.config_json` へ入る。base は実際に Run を回せる条件か
+ * どうかまで確かめ、形だけ整えた偽の実験行が画面へ並ばないようにする。
+ */
+export function isBatchExperimentSnapshot(value: unknown): value is BatchExperimentSnapshot {
+	if (typeof value !== 'object' || value === null) {
+		return false;
+	}
+	const candidate = value as Partial<BatchExperimentSnapshot>;
+	if (candidate.executedIn !== 'browser') {
+		return false;
+	}
+	if (
+		!Number.isInteger(candidate.seeds) ||
+		(candidate.seeds as number) < 1 ||
+		(candidate.seeds as number) > MAX_BROWSER_BATCH_SEEDS
+	) {
+		return false;
+	}
+	if (
+		!Array.isArray(candidate.conditions) ||
+		candidate.conditions.length === 0 ||
+		candidate.conditions.length > MAX_SNAPSHOT_CONDITIONS ||
+		!candidate.conditions.every(
+			(label) =>
+				typeof label === 'string' && label.length > 0 && label.length <= MAX_CONDITION_LABEL_LENGTH,
+		)
+	) {
+		return false;
+	}
+	if (typeof candidate.base !== 'object' || candidate.base === null) {
+		return false;
+	}
+	// 実際に Run を回せる条件かどうかは ExperimentConfig の検証に委ねる
+	return ExperimentConfig.create(candidate.base).success;
 }

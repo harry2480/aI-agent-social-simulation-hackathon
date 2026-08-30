@@ -1,10 +1,12 @@
 import type {
 	BatchExperimentKind,
+	BatchExperimentSnapshot,
 	ConditionAggregate,
 	ExperimentConfigParams,
 } from '@/backend/presentation/composition/watch-mode-engine.composition';
 import {
 	DEFAULT_BATCH_BASE,
+	MAX_BROWSER_BATCH_SEEDS,
 	MAX_DAYS,
 	MAX_POPULATION,
 	experimentPlanOf,
@@ -14,10 +16,9 @@ import {
 
 /**
  * ブラウザ実行で許す Seed 数の上限。
- * Run はメインスレッドで回るため、上限が無いと 1 回の実行が数分単位で伸びる。
- * それ以上の規模は `scripts/run-experiment.ts` の担当（要件定義 40 章）。
+ * 保存を受け付ける側（Server Action）と同じ値でないと、実行できたのに保存で弾かれる。
  */
-export const MAX_BATCH_SEEDS = 20;
+export const MAX_BATCH_SEEDS = MAX_BROWSER_BATCH_SEEDS;
 
 export type { BatchExperimentKind };
 
@@ -50,6 +51,8 @@ export interface BatchPlan {
 	/** 実行する Run の総数。実行前の見積もりと進捗の分母になる */
 	totalRuns: number;
 	conditionCount: number;
+	/** 同じ Run を条件の数だけ数え直す実験か。見積もりの書き方が変わる */
+	sharesRuns: boolean;
 }
 
 export type BatchFormResult = { plan: BatchPlan } | { error: string };
@@ -86,6 +89,7 @@ export function parseBatchForm(form: BatchFormState): BatchFormResult {
 			base: { ...DEFAULT_BATCH_BASE, population: form.population, days: form.days },
 			totalRuns: totalRunCount(plan, form.seeds),
 			conditionCount: plan.conditions.length,
+			sharesRuns: plan.mode === 'judgement',
 		},
 	};
 }
@@ -96,12 +100,7 @@ export function batchExperimentName(kind: BatchExperimentKind, seeds: number): s
 }
 
 /** 保存する条件スナップショット。後から「何を固定して何を振ったか」を読めるようにする */
-export function batchExperimentConfig(plan: BatchPlan): {
-	base: ExperimentConfigParams;
-	seeds: number;
-	conditions: string[];
-	executedIn: 'browser';
-} {
+export function batchExperimentConfig(plan: BatchPlan): BatchExperimentSnapshot {
 	return {
 		base: plan.base,
 		seeds: plan.seeds,

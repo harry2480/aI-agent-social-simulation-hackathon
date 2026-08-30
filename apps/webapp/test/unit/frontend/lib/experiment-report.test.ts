@@ -181,3 +181,87 @@ describe('buildExperimentReport', () => {
 		expect(report.findings).toEqual([]);
 	});
 });
+
+describe('判定条件だけを振った実験', () => {
+	/** 同じ Run を数え直すため、Reach は全条件で同じ値になる */
+	const judgementResults = [
+		aggregate('Rs>1 x2世代 / Reach>=10%', { cascadeProbability: 0, averageReach: 20.8 }),
+		aggregate('Rs>0.75 x1世代 / Reach>=10%', { cascadeProbability: 0.2, averageReach: 20.8 }),
+		aggregate('Rs>0.5 x1世代 / Reach>=5%', { cascadeProbability: 0.6, averageReach: 20.8 }),
+	];
+
+	it('Reach の大小ではなく、判定条件ごとの発生率を見出しにする', () => {
+		// 全条件が同じ Run なので「最大 20.8 / 最小 20.8」と書くと差があるように読める
+		const report = buildExperimentReport({
+			results: judgementResults,
+			runs: [],
+			kind: 'cascade-threshold',
+		});
+
+		expect(report.headline).toContain('3 通りの判定条件で数え直しました');
+		expect(report.headline).toContain('0%〜60%');
+		expect(report.headline).not.toContain('最大');
+	});
+
+	it('対照との差 0 を「抑制しました」と書かない', () => {
+		const report = buildExperimentReport({
+			results: judgementResults,
+			runs: [],
+			kind: 'cascade-threshold',
+		});
+
+		expect(report.findings.some((finding) => finding.includes('人分'))).toBe(false);
+		expect(
+			report.findings.some((finding) => finding.includes('判定条件ごとの Cascade 発生率')),
+		).toBe(true);
+	});
+
+	it('どの判定でも成立しなければ、緩める余地があることを書く', () => {
+		const report = buildExperimentReport({
+			results: judgementResults.map((result) => ({ ...result, cascadeProbability: 0 })),
+			runs: [],
+			kind: 'cascade-threshold',
+		});
+
+		expect(
+			report.findings.some((finding) =>
+				finding.includes('どの判定条件でも Cascade は成立しません'),
+			),
+		).toBe(true);
+	});
+
+	it('種別を渡さない実験ではこれまでどおり Reach の大小を出す', () => {
+		const report = buildExperimentReport({
+			results: [
+				aggregate('baseline', { averageReach: 5 }),
+				aggregate('driver-shock', { averageReach: 30 }),
+			],
+			runs: [],
+		});
+
+		expect(report.headline).toContain('Cascade Reach が最大だったのは');
+	});
+});
+
+describe('Run が保存されていないときの注意文', () => {
+	it('ブラウザ実行では実行方法ではなく実行経路を理由にする', () => {
+		// ブラウザ実行は設計上 Run 単位を保存しない。--save-runs=false を案内すると誤解を招く
+		const report = buildExperimentReport({
+			results: [aggregate('baseline')],
+			runs: [],
+			kind: 'shock-comparison',
+			config: { executedIn: 'browser' },
+		});
+
+		expect(
+			report.cautions.some((caution) => caution.includes('ブラウザ実行は条件ごとの集計だけ')),
+		).toBe(true);
+		expect(report.cautions.some((caution) => caution.includes('--save-runs=false'))).toBe(false);
+	});
+
+	it('スクリプト実行では従来どおり --save-runs=false を案内する', () => {
+		const report = buildExperimentReport({ results: [aggregate('baseline')], runs: [] });
+
+		expect(report.cautions.some((caution) => caution.includes('--save-runs=false'))).toBe(true);
+	});
+});

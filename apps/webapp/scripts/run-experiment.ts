@@ -73,12 +73,20 @@ async function main(): Promise<void> {
 				});
 
 	const startedAt = Date.now();
+	// 進捗は Run ごとに届くが、Sweep では 70 行になるため条件が変わったときだけ出す
+	let loggedLabel: string | null = null;
 	const results: ConditionAggregate[] = await new RunExperimentUseCase(
 		new RuleBasedAiDecisionGateway(),
 	).execute({
 		kind,
 		seeds,
-		onProgress: ({ done, total, label }) => console.log(`[experiment] ${done}/${total} ${label}`),
+		onProgress: ({ done, total, label }) => {
+			if (label === loggedLabel) {
+				return;
+			}
+			loggedLabel = label;
+			console.log(`[experiment] ${done}/${total} ${label}`);
+		},
 		onRunFinished:
 			composition === null || !saveRuns
 				? undefined

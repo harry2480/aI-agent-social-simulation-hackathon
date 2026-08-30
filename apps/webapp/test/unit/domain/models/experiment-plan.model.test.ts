@@ -2,8 +2,10 @@ import { EXPERIMENT_KINDS } from '@/backend/domain/models/experiment-kind.model'
 import {
 	BATCH_EXPERIMENT_KINDS,
 	DEFAULT_BATCH_BASE,
+	MAX_BROWSER_BATCH_SEEDS,
 	experimentPlanOf,
 	isBatchExperimentKind,
+	isBatchExperimentSnapshot,
 	judgementLabel,
 	totalRunCount,
 } from '@/backend/domain/models/experiment-plan.model';
@@ -69,6 +71,16 @@ describe('experimentPlanOf', () => {
 	});
 });
 
+describe('条件ラベル', () => {
+	it('どの実験でも条件ラベルが重複しない', () => {
+		// 集計はラベルをキーにまとめるため、重複すると 2 条件が 1 行へ潰れる
+		for (const kind of BATCH_EXPERIMENT_KINDS) {
+			const labels = experimentPlanOf(kind).conditions.map((condition) => condition.label);
+			expect(new Set(labels).size).toBe(labels.length);
+		}
+	});
+});
+
 describe('totalRunCount', () => {
 	it('条件ごとに Run を回す実験は 条件数 × Seed 数', () => {
 		expect(totalRunCount(experimentPlanOf('shock-comparison'), 5)).toBe(20);
@@ -101,5 +113,46 @@ describe('isBatchExperimentKind', () => {
 		for (const kind of BATCH_EXPERIMENT_KINDS) {
 			expect(EXPERIMENT_KINDS).toContain(kind);
 		}
+	});
+});
+
+describe('isBatchExperimentSnapshot', () => {
+	const snapshot = {
+		base: DEFAULT_BATCH_BASE,
+		seeds: 5,
+		conditions: ['baseline', 'driver-shock'],
+		executedIn: 'browser',
+	};
+
+	it('ブラウザ実行が保存する形を受け付ける', () => {
+		expect(isBatchExperimentSnapshot(snapshot)).toBe(true);
+	});
+
+	it('Run を回せない base を弾く', () => {
+		// 形だけ整えた条件で偽の実験行が画面へ並ばないようにする
+		expect(
+			isBatchExperimentSnapshot({ ...snapshot, base: { ...DEFAULT_BATCH_BASE, population: 0 } }),
+		).toBe(false);
+		expect(isBatchExperimentSnapshot({ ...snapshot, base: null })).toBe(false);
+	});
+
+	it('Seed 数はブラウザ実行の上限までしか認めない', () => {
+		expect(isBatchExperimentSnapshot({ ...snapshot, seeds: MAX_BROWSER_BATCH_SEEDS })).toBe(true);
+		expect(isBatchExperimentSnapshot({ ...snapshot, seeds: MAX_BROWSER_BATCH_SEEDS + 1 })).toBe(
+			false,
+		);
+		expect(isBatchExperimentSnapshot({ ...snapshot, seeds: 0 })).toBe(false);
+	});
+
+	it('条件は 1 件以上の文字列に限る', () => {
+		expect(isBatchExperimentSnapshot({ ...snapshot, conditions: [] })).toBe(false);
+		expect(isBatchExperimentSnapshot({ ...snapshot, conditions: [1] })).toBe(false);
+		expect(isBatchExperimentSnapshot({ ...snapshot, conditions: ['a'.repeat(200)] })).toBe(false);
+	});
+
+	it('ブラウザ実行以外・オブジェクト以外を弾く', () => {
+		expect(isBatchExperimentSnapshot({ ...snapshot, executedIn: 'script' })).toBe(false);
+		expect(isBatchExperimentSnapshot(null)).toBe(false);
+		expect(isBatchExperimentSnapshot('snapshot')).toBe(false);
 	});
 });

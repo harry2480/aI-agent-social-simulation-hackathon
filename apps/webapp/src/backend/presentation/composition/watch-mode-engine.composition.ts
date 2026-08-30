@@ -50,9 +50,13 @@ export function createBrowserBatchExperimentUseCase(): RunExperimentUseCase {
 
 export type { BatchProgress } from '../../application/usecases/run-experiment.usecase';
 export type { ConditionAggregate } from '../../domain/models/experiment-aggregate.model';
-export type { BatchExperimentKind } from '../../domain/models/experiment-plan.model';
+export type {
+	BatchExperimentKind,
+	BatchExperimentSnapshot,
+} from '../../domain/models/experiment-plan.model';
 export {
 	DEFAULT_BATCH_BASE,
+	MAX_BROWSER_BATCH_SEEDS,
 	experimentPlanOf,
 	isBatchExperimentKind,
 	totalRunCount,
