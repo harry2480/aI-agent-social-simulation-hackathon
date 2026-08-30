@@ -15,16 +15,16 @@
 		"prisma": "prisma"
 	},
 	"dependencies": {
-		"@ai-sdk/openai-compatible": "^3.0.31",
+		"@ai-sdk/openai-compatible": "^3.0.33",
 		"@prisma/adapter-pg": "7.9.1",
 		"@prisma/client": "^7.9.1",
 		"@xyflow/react": "^12.11.3",
-		"ai": "^7.0.66",
+		"ai": "^7.0.71",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2",
-		"lucide-react": "^1.31.0",
-		"next": "^16.3.0",
-		"radix-ui": "^1.4.3",
+		"lucide-react": "^1.33.0",
+		"next": "^16.3.1",
+		"radix-ui": "^1.6.7",
 		"react": "^19",
 		"react-dom": "^19",
 		"recharts": "^3.10.1",
@@ -37,13 +37,13 @@
 		"@types/node": "^22",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
-		"@vitest/coverage-v8": "^4.1.10",
+		"@vitest/coverage-v8": "^4.1.11",
 		"dependency-cruiser": "^18.2.0",
 		"dotenv": "^17.3.1",
 		"prisma": "^7.9.1",
 		"tailwindcss": "^4",
 		"tsx": "^4",
 		"typescript": "^5.9.3",
-		"vitest": "^4.1.10"
+		"vitest": "^4.1.11"
 	}
 }
