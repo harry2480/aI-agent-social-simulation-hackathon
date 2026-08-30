@@ -9,6 +9,7 @@ export const EXPERIMENT_KINDS = [
 	'critical-point',
 	'intervention',
 	'super-spreader',
+	'cascade-threshold',
 	'ai-model-comparison',
 ] as const;
 

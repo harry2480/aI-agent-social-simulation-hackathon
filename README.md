@@ -87,12 +87,17 @@ pnpm dev
 
 ### バッチ実験
 
-Vercel Function の実行時間上限に当たるため、重いバッチはスクリプトで実行します。
+`/experiments` の「実験を実行する」から、ブラウザで Multi-seed / Sweep を回せます。
+Experiment Mode は Rule-based 固定で外部 API を呼ばないため、Watch Mode と同じく
+ブラウザで Run を回し、条件ごとの集計だけを保存します（Vercel Function の実行時間上限に当たらない）。
+Run 単位（Agent / Event / Metrics）の時系列まで保存したい場合や、Seed をさらに増やす場合は
+次のスクリプトを使います。
 
 ```sh
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=shock-comparison --seeds=10
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=critical-point --seeds=10
 pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
+pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=cascade-threshold --seeds=10  # 判定条件の感度分析
 pnpm --filter webapp exec tsx scripts/explore-super-spreader.ts   # Stage 2 は OPENROUTER_API_KEY があれば AI Decision で再評価する
 
 # 同一 Seed・同一条件のままモデルだけを変えて比較する（要 OPENROUTER_API_KEY）
@@ -123,6 +128,9 @@ set -a; . apps/webapp/.env.local; set +a
 エラーにせず、実行方法を案内する空状態を表示します。
 
 Cascade 発生率は要件定義の判定（Rs > 1 が 2 世代継続 かつ Reach 10% 以上）に基づきます。
+この判定では発生率が常に 0% になるため、`--kind=cascade-threshold`（画面からも実行可）で
+判定条件だけを変えた感度分析を回せます。判定は Simulation の挙動に影響しないため、
+同じ Run を条件の数だけ数え直します。
 実測の Cascade は「一度大きく広がって収束する」形を取り 2 世代続かないため、この値は 0% になりがちです。
 そのため比較表には Rs の世代継続を問わない **Outbreak 発生率**（Reach が閾値へ達した Run の割合）と、
 収束が始まった世代を併記しています。

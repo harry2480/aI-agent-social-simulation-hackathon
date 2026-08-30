@@ -2,7 +2,7 @@ import type { AiDecisionGateway } from '../gateways/ai-decision.gateway';
 import { scheduleForRole, scheduledBedTick } from '../models/agent-schedule.model';
 import type { Agent } from '../models/agent.model';
 import { City } from '../models/city.model';
-import type { ExperimentConfig } from '../models/experiment-config.model';
+import type { CascadeThresholds, ExperimentConfig } from '../models/experiment-config.model';
 import type { MetricsSnapshot, RunSummary } from '../models/metrics.model';
 import {
 	MINUTES_PER_TICK,
@@ -1234,11 +1234,18 @@ export class SimulationEngine {
 		};
 	}
 
-	summarize(state: SimulationState): RunSummary {
+	/**
+	 * Run 全体を集計する。
+	 *
+	 * `cascadeThresholds` を渡すと、その判定条件で Cascade の成立を数え直す。
+	 * 判定条件は Simulation の挙動に影響しないため、同じ Run を回し直さずに
+	 * 判定だけを振れる（要件定義 24 章の感度分析）。
+	 */
+	summarize(state: SimulationState, cascadeThresholds?: CascadeThresholds): RunSummary {
 		// Peak / Average Rs は Tick 断面と同じ定義を使う。ここで別途算出すると
 		// Watch Mode の KPI と Run 終了後のサマリで値がずれる
 		const latest = this.snapshot(state);
-		const cascade = this.cascadeService.evaluate(state);
+		const cascade = this.cascadeService.evaluate(state, cascadeThresholds);
 
 		// latest には tick が含まれるが RunSummary は断面の時刻を持たないため、必要な項目だけを取る
 		const { tick: _tick, ...metrics } = latest;

@@ -8,11 +8,14 @@ import { buildExperimentReport } from '@/frontend/lib/experiment-report';
 interface ExperimentReportCardProps {
 	results: readonly ExperimentAggregate[];
 	runs: readonly StoredRun[];
+	/** 実験の種別と条件スナップショット。所見の出し方を実験の性質に合わせるために渡す */
+	kind: string;
+	config: unknown;
 }
 
 /** 保存された数値から決定論的に生成する分析レポート。AI には推論させない */
-export function ExperimentReportCard({ results, runs }: ExperimentReportCardProps) {
-	const report = buildExperimentReport({ results, runs });
+export function ExperimentReportCard({ results, runs, kind, config }: ExperimentReportCardProps) {
+	const report = buildExperimentReport({ results, runs, kind, config });
 
 	return (
 		<Card>

@@ -1,75 +1,39 @@
 /**
  * Experiment Mode の Batch Runner。
  *
- * 重い Batch（Multi-seed / Sweep）は Vercel Function の実行時間上限に当たるため、
- * Route Handler ではなくこのスクリプトで実行し、結果のみ DB へ保存する。
+ * ブラウザからも同じ実験を回せる（Experiment Dashboard の「実験を実行する」）が、
+ * こちらは Run 単位（Agent / Event / Metrics）まで保存できる。
+ * 大量の Seed を回す場合や、Run の時系列グラフが要る場合はこのスクリプトを使う。
  *
  * 使い方:
  *   pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=shock-comparison --seeds=10
  *   pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=critical-point --seeds=10
  *   pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=intervention --seeds=10
+ *   pnpm --filter webapp exec tsx scripts/run-experiment.ts --kind=cascade-threshold --seeds=10
  *
  * DATABASE_URL が設定されていない場合は保存せず、集計結果を標準出力へ出す。
- * Run 単位（Agent / Event / Metrics）の保存は Experiment 詳細画面の時系列グラフに必要なため
- * 既定で行う。集計だけが欲しい場合は --save-runs=false を付ける。
+ * Run 単位の保存は Experiment 詳細画面の時系列グラフに必要なため既定で行う。
+ * 集計だけが欲しい場合は --save-runs=false を付ける。
  */
-import type { RunSimulationUseCase } from '../src/backend/application/usecases/run-simulation.usecase';
+import { RunExperimentUseCase } from '../src/backend/application/usecases/run-experiment.usecase';
+import { buildRunPersistencePayload } from '../src/backend/application/usecases/run-simulation.usecase';
+import type { ConditionAggregate } from '../src/backend/domain/models/experiment-aggregate.model';
 import {
-	ExperimentConfig,
-	type ExperimentConfigParams,
-} from '../src/backend/domain/models/experiment-config.model';
-import type { RunSummary } from '../src/backend/domain/models/metrics.model';
-import { SimulationEngine } from '../src/backend/domain/services/simulation-engine.service';
+	BATCH_EXPERIMENT_KINDS,
+	type BatchExperimentKind,
+	DEFAULT_BATCH_BASE,
+	experimentPlanOf,
+	isBatchExperimentKind,
+} from '../src/backend/domain/models/experiment-plan.model';
 import { RuleBasedAiDecisionGateway } from '../src/backend/infrastructure/adapters/rule-based-ai-decision.adapter';
-import {
-	type Aggregate,
-	aggregateSummaries,
-	argValue,
-	formatAggregateLine,
-	parseSeeds,
-} from './lib/experiment-aggregate';
+import { argValue, formatAggregateLine, parseSeeds } from './lib/experiment-aggregate';
 
-type ExperimentKind = 'shock-comparison' | 'critical-point' | 'intervention';
-
-interface Condition {
-	label: string;
-	overrides: Partial<ExperimentConfigParams>;
-}
-
-const BASE: ExperimentConfigParams = {
-	seed: 0,
-	population: 300,
-	days: 7,
-	initialSleepDeprivedRate: 0.1,
-	shockTarget: 'driver',
-};
-
-const CONDITIONS: Record<ExperimentKind, Condition[]> = {
-	'shock-comparison': [
-		{ label: 'baseline', overrides: { shockTarget: 'none', initialSleepDeprivedRate: 0 } },
-		{ label: 'random-shock', overrides: { shockTarget: 'random' } },
-		{ label: 'driver-shock', overrides: { shockTarget: 'driver' } },
-		{ label: 'manager-shock', overrides: { shockTarget: 'manager' } },
-	],
-	'critical-point': [0.01, 0.03, 0.05, 0.07, 0.1, 0.15, 0.2].map((rate) => ({
-		label: `initial-rate-${Math.round(rate * 100)}%`,
-		overrides: { initialSleepDeprivedRate: rate },
-	})),
-	intervention: [
-		{ label: 'none', overrides: { intervention: null } },
-		{ label: 'mandatory-rest', overrides: { intervention: 'mandatory_rest' } },
-		{ label: 'overtime-limit', overrides: { intervention: 'overtime_limit' } },
-		{ label: 'flexible-work', overrides: { intervention: 'flexible_work' } },
-		{ label: 'remote-work', overrides: { intervention: 'remote_work' } },
-	],
-};
-
-function parseArgs(): { kind: ExperimentKind; seeds: number; saveRuns: boolean } {
+function parseArgs(): { kind: BatchExperimentKind; seeds: number; saveRuns: boolean } {
 	const args = process.argv.slice(2);
 
-	const kind = (argValue(args, 'kind') ?? 'shock-comparison') as ExperimentKind;
-	if (!(kind in CONDITIONS)) {
-		throw new Error(`unknown kind: ${kind}. use ${Object.keys(CONDITIONS).join(' | ')}`);
+	const kind = argValue(args, 'kind') ?? 'shock-comparison';
+	if (!isBatchExperimentKind(kind)) {
+		throw new Error(`unknown kind: ${kind}. use ${BATCH_EXPERIMENT_KINDS.join(' | ')}`);
 	}
 	return {
 		kind,
@@ -78,52 +42,10 @@ function parseArgs(): { kind: ExperimentKind; seeds: number; saveRuns: boolean }
 	};
 }
 
-/**
- * Run を 1 本実行する。
- * runner が渡された場合は Run 単位の詳細（Agent / Event / Causal Edge / Metrics）も保存する。
- */
-async function runOnce(
-	params: ExperimentConfigParams,
-	runner: RunSimulationUseCase | null,
-	experimentId: string | null,
-): Promise<RunSummary> {
-	const configResult = ExperimentConfig.create(params);
-	if (!configResult.success) {
-		throw new Error(`invalid experiment config: ${configResult.error}`);
-	}
-
-	if (runner !== null) {
-		const result = await runner.execute({
-			config: configResult.value,
-			experimentId,
-			persist: true,
-		});
-		return result.summary;
-	}
-
-	// Experiment Mode は Rule-based 固定。AI の非決定性を排除し、大量実行のコストを抑える
-	const engine = SimulationEngine.create(configResult.value, new RuleBasedAiDecisionGateway());
-	return engine.run(engine.initialize());
-}
-
-async function aggregate(
-	condition: Condition,
-	seeds: number,
-	runner: RunSimulationUseCase | null,
-	experimentId: string | null,
-): Promise<Aggregate> {
-	const summaries: RunSummary[] = [];
-	for (let seed = 1; seed <= seeds; seed++) {
-		summaries.push(await runOnce({ ...BASE, ...condition.overrides, seed }, runner, experimentId));
-	}
-
-	return aggregateSummaries(condition.label, summaries);
-}
-
 async function main(): Promise<void> {
 	const { kind, seeds, saveRuns } = parseArgs();
-	const conditions = CONDITIONS[kind];
-	console.log(`[experiment] kind=${kind} seeds=${seeds} conditions=${conditions.length}`);
+	const plan = experimentPlanOf(kind);
+	console.log(`[experiment] kind=${kind} seeds=${seeds} conditions=${plan.conditions.length}`);
 
 	const persists = process.env.DATABASE_URL !== undefined;
 	if (!persists) {
@@ -143,18 +65,42 @@ async function main(): Promise<void> {
 			: await composition.experimentRepository.create({
 					name: `${kind} (${seeds} seeds)`,
 					kind,
-					config: { base: BASE, seeds, conditions: conditions.map((c) => c.label) },
+					config: {
+						base: DEFAULT_BATCH_BASE,
+						seeds,
+						conditions: plan.conditions.map((condition) => condition.label),
+					},
 				});
-	const runner =
-		composition === null || !saveRuns ? null : composition.createExperimentRunSimulationUseCase();
 
-	const results: Aggregate[] = [];
-	for (const condition of conditions) {
-		const startedAt = Date.now();
-		const result = await aggregate(condition, seeds, runner, experimentId);
-		results.push(result);
-		console.log(`${formatAggregateLine(result, 20)} (${Date.now() - startedAt}ms)`);
+	const startedAt = Date.now();
+	// 進捗は Run ごとに届くが、Sweep では 70 行になるため条件が変わったときだけ出す
+	let loggedLabel: string | null = null;
+	const results: ConditionAggregate[] = await new RunExperimentUseCase(
+		new RuleBasedAiDecisionGateway(),
+	).execute({
+		kind,
+		seeds,
+		onProgress: ({ done, total, label }) => {
+			if (label === loggedLabel) {
+				return;
+			}
+			loggedLabel = label;
+			console.log(`[experiment] ${done}/${total} ${label}`);
+		},
+		onRunFinished:
+			composition === null || !saveRuns
+				? undefined
+				: async ({ state, summary }) => {
+						await composition.simulationRunRepository.save(
+							buildRunPersistencePayload(state, summary, experimentId),
+						);
+					},
+	});
+
+	for (const result of results) {
+		console.log(formatAggregateLine(result, 28));
 	}
+	console.log(`[experiment] finished in ${Date.now() - startedAt}ms`);
 
 	if (composition === null || experimentId === null) {
 		return;
@@ -164,9 +110,7 @@ async function main(): Promise<void> {
 		experimentId,
 		results.map((result) => ({ ...result, aggregate: result })),
 	);
-	console.log(
-		`[experiment] saved: experimentId=${experimentId} runs=${saveRuns ? conditions.length * seeds : 0}`,
-	);
+	console.log(`[experiment] saved: experimentId=${experimentId} runs=${saveRuns ? 'yes' : 'no'}`);
 }
 
 main().catch((error: unknown) => {
