@@ -6,6 +6,8 @@ function metrics(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot {
 	return {
 		tick: 0,
 		currentRs: 0,
+		peakRs: 0,
+		averageRs: 0,
 		sleepDeprivedPopulation: 0,
 		severeSleepDeprivedPopulation: 0,
 		totalSleepDebtHours: 0,
@@ -66,6 +68,25 @@ describe('buildKpiRows', () => {
 		const rows = buildKpiRows(metrics({ cascadeReach: 1234 }), 5000);
 
 		expect(rowValue(rows, 'Cascade Reach')).toBe('1,234');
+	});
+
+	it('Peak Rs と Average Rs を Current Rs と並べて出す', () => {
+		// 要件定義 25 章。Run 終了を待たずに増幅の勢いを読めるようにする
+		const rows = buildKpiRows(metrics({ currentRs: 0.5, peakRs: 2.25, averageRs: 1.125 }), 300);
+
+		expect(rowValue(rows, 'Peak Rs')).toBe('2.25');
+		expect(rowValue(rows, 'Average Rs')).toBe('1.13');
+	});
+
+	it('Traffic Delay は渋滞の累計分を出す', () => {
+		// 1 人あたりの平均を出す Avg Commute Delay とは別の指標
+		const rows = buildKpiRows(
+			metrics({ trafficDelayMinutes: 1234, averageCommuteDelayMinutes: 5.6 }),
+			300,
+		);
+
+		expect(rowValue(rows, 'Traffic Delay')).toBe('1,234 min');
+		expect(rowValue(rows, 'Avg Commute Delay')).toBe('5.6 min');
 	});
 
 	it('値が 0 のときは 0 を出す。- にはしない', () => {

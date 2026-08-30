@@ -23,6 +23,8 @@ export function buildKpiRows(metrics: MetricsSnapshot | null, population: number
 
 	return [
 		{ label: 'Current Rs', value: formatNumber(metrics.currentRs) },
+		{ label: 'Peak Rs', value: formatNumber(metrics.peakRs) },
+		{ label: 'Average Rs', value: formatNumber(metrics.averageRs) },
 		{
 			label: 'Sleep-Deprived',
 			value: `${formatInteger(metrics.sleepDeprivedPopulation)} / ${formatInteger(population)}`,
@@ -34,6 +36,8 @@ export function buildKpiRows(metrics: MetricsSnapshot | null, population: number
 		{ label: 'Cascade Depth', value: formatInteger(metrics.cascadeDepth) },
 		{ label: 'Generation', value: formatInteger(metrics.cascadeGeneration) },
 		{ label: 'Accidents', value: formatInteger(metrics.accidentCount) },
+		// 渋滞で失われた累計時間。1 人あたりの平均を出す Avg Commute Delay とは別物
+		{ label: 'Traffic Delay', value: `${formatInteger(metrics.trafficDelayMinutes)} min` },
 		{ label: 'Overtime', value: `${formatNumber(metrics.overtimeHours, 1)} h` },
 		{
 			label: 'Avg Commute Delay',
@@ -45,6 +49,8 @@ export function buildKpiRows(metrics: MetricsSnapshot | null, population: number
 /** 表示順。Metrics が無くても同じ並び・同じ行数を出し、レイアウトを揺らさない */
 const KPI_LABELS = [
 	'Current Rs',
+	'Peak Rs',
+	'Average Rs',
 	'Sleep-Deprived',
 	'Severe',
 	'Total Sleep Debt',
@@ -53,6 +59,7 @@ const KPI_LABELS = [
 	'Cascade Depth',
 	'Generation',
 	'Accidents',
+	'Traffic Delay',
 	'Overtime',
 	'Avg Commute Delay',
 ];

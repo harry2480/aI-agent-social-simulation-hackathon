@@ -6,6 +6,8 @@ function snapshot(overrides: Partial<MetricsSnapshot> = {}): MetricsSnapshot {
 	return {
 		tick: 0,
 		currentRs: 0,
+		peakRs: 0,
+		averageRs: 0,
 		sleepDeprivedPopulation: 0,
 		severeSleepDeprivedPopulation: 0,
 		totalSleepDebtHours: 0,

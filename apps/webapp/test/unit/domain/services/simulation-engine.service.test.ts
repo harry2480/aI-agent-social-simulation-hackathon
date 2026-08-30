@@ -132,6 +132,18 @@ describe('SimulationEngine', () => {
 			}
 		});
 
+		it('Tick 断面の Peak / Average Rs は Run サマリと一致する', async () => {
+			// Watch Mode の KPI パネルは断面を読むため、定義がずれるとサマリと違う値が出る
+			const engine = SimulationEngine.create(config(), new RuleBasedAiDecisionGateway());
+			const state = engine.initialize();
+			const summary = await engine.run(state);
+			const latest = engine.snapshot(state);
+
+			expect(latest.peakRs).toBe(summary.peakRs);
+			expect(latest.averageRs).toBe(summary.averageRs);
+			expect(latest.peakRs).toBeGreaterThanOrEqual(latest.averageRs);
+		});
+
 		it('Agent 属性は範囲内に収まる', async () => {
 			const { state } = await run();
 			for (const agent of state.agents.values()) {

@@ -2,6 +2,13 @@
 export interface MetricsSnapshot {
 	tick: number;
 	currentRs: number;
+	/**
+	 * その時点までの Rs 系列の最大値・平均値。
+	 * Run 終了後の RunSummary と同じ Generation 系列から出すため、
+	 * Watch Mode の KPI と Experiment Dashboard の値が同じ定義で並ぶ。
+	 */
+	peakRs: number;
+	averageRs: number;
 	sleepDeprivedPopulation: number;
 	severeSleepDeprivedPopulation: number;
 	totalSleepDebtHours: number;
