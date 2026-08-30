@@ -1212,9 +1212,13 @@ export class SimulationEngine {
 		}
 
 		const cascade = this.cascadeService.evaluate(state);
+		const rsSeries = this.reproductionNumberService.rsByGeneration(state);
 		return {
 			tick: state.clock.tick,
 			currentRs: this.reproductionNumberService.currentRs(state),
+			peakRs: rsSeries.length === 0 ? 0 : Math.max(...rsSeries),
+			averageRs:
+				rsSeries.length === 0 ? 0 : rsSeries.reduce((sum, rs) => sum + rs, 0) / rsSeries.length,
 			sleepDeprivedPopulation: deprived,
 			severeSleepDeprivedPopulation: severe,
 			totalSleepDebtHours,
@@ -1231,19 +1235,15 @@ export class SimulationEngine {
 	}
 
 	summarize(state: SimulationState): RunSummary {
+		// Peak / Average Rs は Tick 断面と同じ定義を使う。ここで別途算出すると
+		// Watch Mode の KPI と Run 終了後のサマリで値がずれる
 		const latest = this.snapshot(state);
-		const rsSeries = this.reproductionNumberService.rsByGeneration(state);
-		const peakRs = rsSeries.length === 0 ? 0 : Math.max(...rsSeries);
-		const averageRs =
-			rsSeries.length === 0 ? 0 : rsSeries.reduce((sum, rs) => sum + rs, 0) / rsSeries.length;
 		const cascade = this.cascadeService.evaluate(state);
 
 		// latest には tick が含まれるが RunSummary は断面の時刻を持たないため、必要な項目だけを取る
 		const { tick: _tick, ...metrics } = latest;
 		return {
 			...metrics,
-			peakRs,
-			averageRs,
 			cascadeOccurred: cascade.occurred,
 			outbreakOccurred: cascade.outbreakOccurred,
 			dampingGeneration: cascade.dampingGeneration,
