@@ -3,6 +3,7 @@ import {
 	loadRecentExperiments,
 } from '@/backend/presentation/loaders/experiment.loader';
 import { ExperimentList } from '@/frontend/components/experiments/experiment-list';
+import { ExperimentRunner } from '@/frontend/components/experiments/experiment-runner';
 import Link from 'next/link';
 
 /** DB の内容は Batch Runner の実行で変わるため、ビルド時に固定しない */
@@ -36,6 +37,7 @@ export default async function ExperimentsPage() {
 				条件ごとの平均と標準偏差を併記しています。比較実験では Experimental Variable
 				以外（Population・Agent 属性・City 構造・Seed 群）を固定しています。
 			</p>
+			<ExperimentRunner databaseConfigured={isDatabaseConfigured()} />
 			<ExperimentList experiments={experiments} databaseConfigured={isDatabaseConfigured()} />
 		</main>
 	);

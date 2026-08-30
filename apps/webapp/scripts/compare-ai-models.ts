@@ -14,17 +14,15 @@
  */
 import type { RunSimulationUseCase } from '../src/backend/application/usecases/run-simulation.usecase';
 import {
+	type ConditionAggregate,
+	aggregateSummaries,
+} from '../src/backend/domain/models/experiment-aggregate.model';
+import {
 	ExperimentConfig,
 	type ExperimentConfigParams,
 } from '../src/backend/domain/models/experiment-config.model';
 import type { RunSummary } from '../src/backend/domain/models/metrics.model';
-import {
-	type Aggregate,
-	aggregateSummaries,
-	argValue,
-	formatAggregateLine,
-	parseSeeds,
-} from './lib/experiment-aggregate';
+import { argValue, formatAggregateLine, parseSeeds } from './lib/experiment-aggregate';
 
 /** 比較で固定する条件。変えるのはモデルだけ（要件定義 28 章） */
 const BASE: ExperimentConfigParams = {
@@ -90,7 +88,7 @@ async function main(): Promise<void> {
 		: null;
 
 	console.log(`[ai-model] models=${models.join(', ')} seeds=${seeds}`);
-	const results: Aggregate[] = [];
+	const results: ConditionAggregate[] = [];
 
 	for (const model of models) {
 		const runner = composition.createModelComparisonRunSimulationUseCase(model);

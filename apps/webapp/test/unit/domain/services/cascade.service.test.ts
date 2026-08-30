@@ -49,6 +49,22 @@ describe('CascadeService.evaluate', () => {
 		expect(status.reach).toBe(2);
 	});
 
+	it('判定条件を渡すと、同じ Run をその条件で数え直す', () => {
+		// Run を回し直さずに「どの判定なら Cascade と呼べるか」を測るため（要件定義 24 章）
+		const state = buildState();
+		transmit(state, 'a', 'b', 0);
+		transmit(state, 'a', 'c', 0);
+
+		expect(service.evaluate(state).occurred).toBe(false);
+		expect(
+			service.evaluate(state, { rsThreshold: 1, minGenerations: 1, minReachRate: 0.1 }).occurred,
+		).toBe(true);
+		// Reach の条件を満たさなければ、世代の条件を緩めても成立しない
+		expect(
+			service.evaluate(state, { rsThreshold: 1, minGenerations: 1, minReachRate: 0.5 }).occurred,
+		).toBe(false);
+	});
+
 	it('Rs > 1 が 2 世代続き Reach が閾値を超えると Cascade が成立する', () => {
 		const state = buildState();
 		transmit(state, 'a', 'b', 0);

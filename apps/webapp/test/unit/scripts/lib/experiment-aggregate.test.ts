@@ -1,12 +1,10 @@
+import { aggregateSummaries } from '@/backend/domain/models/experiment-aggregate.model';
 import type { RunSummary } from '@/backend/domain/models/metrics.model';
 import { describe, expect, it } from 'vitest';
 import {
-	aggregateSummaries,
 	argValue,
-	averageDampingGeneration,
 	formatAggregateLine,
 	parseSeeds,
-	standardDeviation,
 } from '../../../../scripts/lib/experiment-aggregate';
 
 function summary(overrides: Partial<RunSummary> = {}): RunSummary {
@@ -57,7 +55,6 @@ describe('argValue', () => {
 		expect(argValue(['--models='], 'models')).toBe('');
 	});
 });
-
 describe('parseSeeds', () => {
 	it('未指定なら既定値を使う', () => {
 		expect(parseSeeds(undefined, 10)).toBe(10);
@@ -75,132 +72,6 @@ describe('parseSeeds', () => {
 		}
 	});
 });
-
-describe('standardDeviation', () => {
-	it('母集団の標準偏差を返す', () => {
-		expect(standardDeviation([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2, 10);
-	});
-
-	it('ばらつきが無ければ 0', () => {
-		expect(standardDeviation([3, 3, 3])).toBe(0);
-	});
-
-	it('空配列でも NaN にせず 0 を返す', () => {
-		expect(standardDeviation([])).toBe(0);
-	});
-});
-
-describe('averageDampingGeneration', () => {
-	it('収束した Run だけの平均を取る', () => {
-		// 一度も閾値を超えなかった Run は「収束する山が無かった」ため対象から除く
-		const summaries = [
-			summary({ dampingGeneration: 2 }),
-			summary({ dampingGeneration: 4 }),
-			summary({ dampingGeneration: null }),
-		];
-
-		expect(averageDampingGeneration(summaries)).toBe(3);
-	});
-
-	it('どの Run も閾値を超えなければ null', () => {
-		expect(averageDampingGeneration([summary(), summary()])).toBeNull();
-	});
-
-	it('世代 0 を「収束しなかった」と取り違えない', () => {
-		expect(averageDampingGeneration([summary({ dampingGeneration: 0 })])).toBe(0);
-	});
-});
-
-describe('aggregateSummaries', () => {
-	it('Cascade と Outbreak の発生率を別々に数える', () => {
-		// Cascade 判定は成立しないが一度大きく広がる条件を取りこぼさないため
-		const summaries = [
-			summary({ cascadeOccurred: true, outbreakOccurred: true }),
-			summary({ cascadeOccurred: false, outbreakOccurred: true }),
-			summary({ cascadeOccurred: false, outbreakOccurred: false }),
-			summary({ cascadeOccurred: false, outbreakOccurred: false }),
-		];
-
-		const aggregate = aggregateSummaries('driver-shock', summaries);
-
-		expect(aggregate.cascadeProbability).toBe(0.25);
-		expect(aggregate.outbreakProbability).toBe(0.5);
-	});
-
-	it('Rs は平均と Peak を分けて持つ', () => {
-		const summaries = [summary({ averageRs: 1, peakRs: 2 }), summary({ averageRs: 2, peakRs: 5 })];
-
-		const aggregate = aggregateSummaries('label', summaries);
-
-		expect(aggregate.averageRs).toBe(1.5);
-		// Peak は Run をまたいだ最大値。平均すると尖りが消える
-		expect(aggregate.peakRs).toBe(5);
-	});
-
-	it('Cascade Reach は平均と標準偏差を併記する', () => {
-		const summaries = [
-			summary({ cascadeReach: 10 }),
-			summary({ cascadeReach: 20 }),
-			summary({ cascadeReach: 30 }),
-		];
-
-		const aggregate = aggregateSummaries('label', summaries);
-
-		expect(aggregate.averageReach).toBe(20);
-		expect(aggregate.standardDeviation).toBeCloseTo(8.16496580927726, 10);
-	});
-
-	it('Sleep Loss は合計ではなく Run あたりの平均を入れる', () => {
-		// フィールド名は totalSleepLossMinutes だが、Seed 数が違う条件を並べるため平均で持つ
-		const summaries = [
-			summary({ totalSleepLossMinutes: 100 }),
-			summary({ totalSleepLossMinutes: 300 }),
-		];
-
-		expect(aggregateSummaries('label', summaries).totalSleepLossMinutes).toBe(200);
-	});
-
-	it('介入の副作用を読む指標を Run あたりの平均で持つ', () => {
-		// 伝播が減っても事故や残業が増えているなら、その介入は成功と言えない（要件定義 32 章）
-		const summaries = [
-			summary({
-				totalSleepDebtHours: 100,
-				cascadeDepth: 2,
-				accidentCount: 4,
-				overtimeHours: 30,
-				averageCommuteDelayMinutes: 10,
-			}),
-			summary({
-				totalSleepDebtHours: 200,
-				cascadeDepth: 4,
-				accidentCount: 6,
-				overtimeHours: 50,
-				averageCommuteDelayMinutes: 20,
-			}),
-		];
-
-		const aggregate = aggregateSummaries('mandatory-rest', summaries);
-
-		expect(aggregate.averageSleepDebtHours).toBe(150);
-		expect(aggregate.averageCascadeDepth).toBe(3);
-		expect(aggregate.averageAccidentCount).toBe(5);
-		expect(aggregate.averageOvertimeHours).toBe(40);
-		expect(aggregate.averageCommuteDelayMinutes).toBe(15);
-	});
-
-	it('ラベルと Run 数をそのまま持つ', () => {
-		const aggregate = aggregateSummaries('mandatory-rest', [summary(), summary()]);
-
-		expect(aggregate.label).toBe('mandatory-rest');
-		expect(aggregate.runCount).toBe(2);
-	});
-
-	it('Run が 0 本なら例外にする', () => {
-		// 平均が NaN、Peak Rs が -Infinity のまま DB へ入るのを防ぐ
-		expect(() => aggregateSummaries('baseline', [])).toThrow('Run が 1 本もありません');
-	});
-});
-
 describe('formatAggregateLine', () => {
 	it('実験の種類によらず同じ列で読める 1 行にする', () => {
 		const aggregate = aggregateSummaries('driver-shock', [

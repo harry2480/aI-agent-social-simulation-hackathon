@@ -1,3 +1,4 @@
+import { RunExperimentUseCase } from '../../application/usecases/run-experiment.usecase';
 import { buildRunPersistencePayload } from '../../application/usecases/run-simulation.usecase';
 import type { AiDecisionGateway } from '../../domain/gateways/ai-decision.gateway';
 import type { ExperimentConfig } from '../../domain/models/experiment-config.model';
@@ -35,6 +36,27 @@ export function createWatchModeEngine(
 
 	return SimulationEngine.create(config, gateway);
 }
+
+/**
+ * ブラウザで Batch 実験（Multi-seed / Sweep）を回すための Composition。
+ *
+ * Multi-seed / Sweep は Vercel Function の実行時間上限に当たるためサーバーでは完走できない。
+ * Experiment Mode は Rule-based 固定（要件定義 40 章）で外部 API を呼ばないため、
+ * Watch Mode と同じくブラウザで回せる。結果は Server Action で保存する。
+ */
+export function createBrowserBatchExperimentUseCase(): RunExperimentUseCase {
+	return new RunExperimentUseCase(new RuleBasedAiDecisionGateway());
+}
+
+export type { BatchProgress } from '../../application/usecases/run-experiment.usecase';
+export type { ConditionAggregate } from '../../domain/models/experiment-aggregate.model';
+export type { BatchExperimentKind } from '../../domain/models/experiment-plan.model';
+export {
+	DEFAULT_BATCH_BASE,
+	experimentPlanOf,
+	isBatchExperimentKind,
+	totalRunCount,
+} from '../../domain/models/experiment-plan.model';
 
 /**
  * Watch Mode UI が必要とする型の再エクスポート。

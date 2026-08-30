@@ -51,6 +51,10 @@ export type {
 	StoredExperiment,
 	ExperimentAggregate,
 } from '../../domain/repositories/experiment.repository';
+export type { ConditionAggregate } from '../../domain/models/experiment-aggregate.model';
+export { isConditionAggregate } from '../../domain/models/experiment-aggregate.model';
+export type { BatchExperimentKind } from '../../domain/models/experiment-plan.model';
+export { isBatchExperimentKind } from '../../domain/models/experiment-plan.model';
 export type { ExperimentKind } from '../../domain/models/experiment-kind.model';
 export { EXPERIMENT_KINDS, isExperimentKind } from '../../domain/models/experiment-kind.model';
 export type {

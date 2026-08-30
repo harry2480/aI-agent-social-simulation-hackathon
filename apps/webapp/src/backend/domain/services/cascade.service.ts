@@ -1,3 +1,4 @@
+import type { CascadeThresholds } from '../models/experiment-config.model';
 import { type NetworkName, networkOfEventType } from '../models/simulation-event.model';
 import type { SimulationState } from '../models/simulation-state.model';
 import type { ReproductionNumberService } from './reproduction-number.service';
@@ -29,8 +30,15 @@ export interface CascadeStatus {
 export class CascadeService {
 	constructor(private readonly reproductionNumberService: ReproductionNumberService) {}
 
-	evaluate(state: SimulationState): CascadeStatus {
-		const thresholds = state.config.cascadeThresholds;
+	/**
+	 * Cascade の成立を判定する。
+	 *
+	 * 判定条件は Simulation の挙動に一切影響しないため、実行済みの Run を
+	 * 別の判定条件で数え直せる（要件定義 24 章の感度分析）。
+	 * 省略時は Run の Config に入っている判定条件を使う。
+	 */
+	evaluate(state: SimulationState, override?: CascadeThresholds): CascadeStatus {
+		const thresholds = override ?? state.config.cascadeThresholds;
 		const rsSeries = this.reproductionNumberService.rsByGeneration(state);
 
 		let longestStreak = 0;
