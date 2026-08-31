@@ -24,7 +24,7 @@
 		"pre-push": "pnpm verify"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9",
+		"@biomejs/biome": "^2.5",
 		"knip": "^6.32.2",
 		"simple-git-hooks": "^2.13.1",
 		"supabase": "^2.115.0",
